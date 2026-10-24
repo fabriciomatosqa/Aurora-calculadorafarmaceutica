@@ -24,6 +24,7 @@ Para compilar localmente com Flutter e Android SDK:
 
 ```bash
 flutter create --project-name aurora_calculadora_farmaceutica --org br.com.aurora --platforms android .
+python3 scripts/configure_android.py  # configura permissões e, se houver secrets, assinatura
 flutter pub get
 flutter analyze
 flutter test

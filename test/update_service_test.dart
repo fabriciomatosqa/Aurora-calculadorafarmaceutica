@@ -21,13 +21,13 @@ void main() {
           'name': 'aurora-calculadora-farmaceutica-v0.3.0-android.apk',
           'browser_download_url': 'https://github.com/fabriciomatosqa/Aurora-calculadorafarmaceutica/releases/download/v0.3.0/aurora-calculadora-farmaceutica-v0.3.0-android.apk',
           'size': 20000000,
-          'digest': 'sha256:${'a' * 64}',
+          'digest': 'sha256:${List<String>.filled(64, 'a').join()}',
         },
       ],
     });
     expect(release.version, '0.3.0');
     expect(release.apkUrl, isNotNull);
-    expect(release.digest, 'a' * 64);
+    expect(release.digest, List<String>.filled(64, 'a').join());
     expect(release.size, 20000000);
   });
 

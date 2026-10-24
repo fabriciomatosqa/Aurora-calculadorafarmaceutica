@@ -19,7 +19,10 @@ const _violet = Color(0xFF8068F5);
 const _navy = Color(0xFF0D1426);
 
 class AuroraApp extends StatelessWidget {
-  const AuroraApp({super.key});
+  const AuroraApp({super.key, this.enableAutomaticUpdates = true});
+
+  /// Disable external update checks in deterministic widget tests.
+  final bool enableAutomaticUpdates;
 
   @override
   Widget build(BuildContext context) {
@@ -59,7 +62,7 @@ class AuroraApp extends StatelessWidget {
       theme: buildTheme(Brightness.light),
       darkTheme: buildTheme(Brightness.dark),
       themeMode: ThemeMode.system,
-      home: const CalculatorHome(),
+      home: CalculatorHome(automaticUpdates: enableAutomaticUpdates),
     );
   }
 }
@@ -71,7 +74,9 @@ IconData categoryIcon(CalculatorCategory category) => switch (category) {
     };
 
 class CalculatorHome extends StatefulWidget {
-  const CalculatorHome({super.key});
+  const CalculatorHome({super.key, this.automaticUpdates = true});
+
+  final bool automaticUpdates;
   @override
   State<CalculatorHome> createState() => _CalculatorHomeState();
 }
@@ -89,17 +94,19 @@ class _CalculatorHomeState extends State<CalculatorHome> with WidgetsBindingObse
   void initState() {
     super.initState();
     _loadFavorites();
-    WidgetsBinding.instance.addObserver(this);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) unawaited(_checkForUpdates(automatic: true));
-    });
+    if (widget.automaticUpdates) {
+      WidgetsBinding.instance.addObserver(this);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_checkForUpdates(automatic: true));
+      });
+    }
     _search.addListener(() { if (mounted) setState(() {}); });
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    if (state == AppLifecycleState.resumed) {
+    if (widget.automaticUpdates && state == AppLifecycleState.resumed) {
       unawaited(_checkForUpdates(automatic: true));
     }
   }
@@ -251,7 +258,9 @@ class _CalculatorHomeState extends State<CalculatorHome> with WidgetsBindingObse
   @override
   void dispose() {
     _search.dispose();
-    WidgetsBinding.instance.removeObserver(this);
+    if (widget.automaticUpdates) {
+      WidgetsBinding.instance.removeObserver(this);
+    }
     _updates.dispose();
     super.dispose();
   }

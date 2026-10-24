@@ -1,4 +1,4 @@
-name: Android APK - testes e compilação
+name: Android - testes, APK e Release
 
 on:
   push:
@@ -6,12 +6,12 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-android:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
       - name: Java 17
@@ -19,25 +19,78 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Flutter (stable)
+      - name: Flutter stable
         uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
-      - name: Gerar plataforma Android do projeto
+      - name: Criar projeto Android sem sobrescrever fontes
         run: flutter create --project-name aurora_calculadora_farmaceutica --org br.com.aurora --platforms android .
+      - name: Preparar permissões Android e assinatura opcional
+        env:
+          AURORA_KEYSTORE_BASE64: ${{ secrets.AURORA_KEYSTORE_BASE64 }}
+          AURORA_KEYSTORE_PASSWORD: ${{ secrets.AURORA_KEYSTORE_PASSWORD }}
+          AURORA_KEY_ALIAS: ${{ secrets.AURORA_KEY_ALIAS }}
+          AURORA_KEY_PASSWORD: ${{ secrets.AURORA_KEY_PASSWORD }}
+        run: python3 scripts/configure_android.py
       - name: Instalar dependências
         run: flutter pub get
-      - name: Analisar código
+      - name: Validar código
         run: flutter analyze
-      - name: Executar testes
+      - name: Executar testes unitários e widgets
         run: flutter test
-      - name: Compilar APK de teste instalável
+      - name: Compilar APK de teste
         run: flutter build apk --debug
-      - name: Publicar APK como artefato
+      - name: Publicar APK de teste nos Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: aurora-calculadora-farmaceutica-android-v0.1.0-debug
+          name: aurora-farmaceutica-debug-${{ github.run_number }}
           path: build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: error
           retention-days: 30
+      - name: Compilar APK release assinado
+        if: env.AURORA_RELEASE_READY == 'true'
+        env:
+          AURORA_KEYSTORE_PASSWORD: ${{ secrets.AURORA_KEYSTORE_PASSWORD }}
+          AURORA_KEY_ALIAS: ${{ secrets.AURORA_KEY_ALIAS }}
+          AURORA_KEY_PASSWORD: ${{ secrets.AURORA_KEY_PASSWORD }}
+        run: flutter build apk --release
+      - name: Montar APK versionado e checksum
+        if: env.AURORA_RELEASE_READY == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(sed -n 's/^version: \([^+]*\).*/\1/p' pubspec.yaml)
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid pubspec version"; exit 1
+          fi
+          mkdir -p dist
+          NAME="aurora-calculadora-farmaceutica-v${VERSION}-android.apk"
+          cp build/app/outputs/flutter-apk/app-release.apk "dist/${NAME}"
+          (cd dist && sha256sum "${NAME}" > "${NAME}.sha256")
+          echo "AURORA_VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "AURORA_APK_NAME=$NAME" >> "$GITHUB_ENV"
+      - name: Publicar release APK como artifact
+        if: env.AURORA_RELEASE_READY == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: aurora-farmaceutica-release-${{ github.run_number }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Publicar GitHub Release da versão
+        if: env.AURORA_RELEASE_READY == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="v${AURORA_VERSION}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists. Increase pubspec version for next release."
+            exit 0
+          fi
+          gh release create "$TAG" "dist/${AURORA_APK_NAME}" "dist/${AURORA_APK_NAME}.sha256" \
+            --target "$GITHUB_SHA" --title "AURORA Calculadora Farmacêutica $TAG" \
+            --notes "APK Android assinado. Confira as alterações e valide o aplicativo antes de uso regulado." \
+            --latest

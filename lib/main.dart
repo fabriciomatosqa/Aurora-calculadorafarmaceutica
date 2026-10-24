@@ -205,12 +205,18 @@ class _CalculatorHomeState extends State<CalculatorHome> with WidgetsBindingObse
       await _updates.requestInstallation(apk);
     } on UpdateException catch (error) {
       if (mounted) {
-        if (!dialogClosed) Navigator.of(context, rootNavigator: true).pop();
+        if (!dialogClosed) {
+          Navigator.of(context, rootNavigator: true).pop();
+          dialogClosed = true;
+        }
         _message(error.message);
       }
     } catch (_) {
       if (mounted) {
-        if (!dialogClosed) Navigator.of(context, rootNavigator: true).pop();
+        if (!dialogClosed) {
+          Navigator.of(context, rootNavigator: true).pop();
+          dialogClosed = true;
+        }
         _message('Falha ao baixar ou abrir o APK. Tente novamente.');
       }
     } finally {

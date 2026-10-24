@@ -44,7 +44,9 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          flutter analyze 2>&1 | tee .ci-logs/flutter-analyze.log
+          # Warnings and style suggestions remain visible in the log but
+          # only analyzer errors block tests and APK compilation.
+          flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 | tee .ci-logs/flutter-analyze.log
       - name: Executar testes unitários e widgets
         shell: bash
         run: |

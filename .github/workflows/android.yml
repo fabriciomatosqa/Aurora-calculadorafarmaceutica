@@ -35,12 +35,34 @@ jobs:
         run: python3 scripts/configure_android.py
       - name: Instalar dependências
         run: flutter pub get
+      - name: Registrar versão das ferramentas
+        run: |
+          flutter --version
+          dart --version
+          mkdir -p .ci-logs
       - name: Validar código
-        run: flutter analyze
+        shell: bash
+        run: |
+          set -o pipefail
+          flutter analyze 2>&1 | tee .ci-logs/flutter-analyze.log
       - name: Executar testes unitários e widgets
-        run: flutter test
+        shell: bash
+        run: |
+          set -o pipefail
+          flutter test 2>&1 | tee .ci-logs/flutter-test.log
       - name: Compilar APK de teste
-        run: flutter build apk --debug
+        shell: bash
+        run: |
+          set -o pipefail
+          flutter build apk --debug 2>&1 | tee .ci-logs/flutter-build-android.log
+      - name: Guardar logs quando o job falhar
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagnostico-android-${{ github.run_number }}
+          path: .ci-logs/
+          retention-days: 14
+          if-no-files-found: warn
       - name: Publicar APK de teste nos Artifacts
         uses: actions/upload-artifact@v4
         with:

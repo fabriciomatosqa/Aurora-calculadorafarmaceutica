@@ -157,7 +157,8 @@ class _CalculatorHomeState extends State<CalculatorHome> {
   Future<void> _downloadAndInstall(AppRelease release) async {
     final progress = ValueNotifier<double?>(null);
     // Modal permanece visível até concluir a verificação SHA-256.
-    unawaited(showDialog<void>(
+    bool dialogClosed = false;
+    final dialogFuture = showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => PopScope(
@@ -178,7 +179,7 @@ class _CalculatorHomeState extends State<CalculatorHome> {
           ),
         ),
       ),
-    ));
+    );
     // Permite que o diálogo seja desenhado antes de iniciar a transferência.
     await Future<void>.delayed(const Duration(milliseconds: 80));
     try {
@@ -191,20 +192,22 @@ class _CalculatorHomeState extends State<CalculatorHome> {
       );
       if (!mounted) return;
       Navigator.of(context, rootNavigator: true).pop();
+      dialogClosed = true;
       await _updates.requestInstallation(apk);
     } on UpdateException catch (error) {
       if (mounted) {
-        Navigator.of(context, rootNavigator: true).pop();
+        if (!dialogClosed) Navigator.of(context, rootNavigator: true).pop();
         _message(error.message);
       }
     } catch (_) {
       if (mounted) {
-        Navigator.of(context, rootNavigator: true).pop();
+        if (!dialogClosed) Navigator.of(context, rootNavigator: true).pop();
         _message('Falha ao baixar ou abrir o APK. Tente novamente.');
       }
     } finally {
-      // Destroy after the dialog is removed to avoid listener usage after dispose.
-      await Future<void>.delayed(const Duration(milliseconds: 100));
+      // Release resources only after the dialog's transition has completed.
+      if (mounted && !dialogClosed) Navigator.of(context, rootNavigator: true).pop();
+      await dialogFuture;
       progress.dispose();
     }
   }

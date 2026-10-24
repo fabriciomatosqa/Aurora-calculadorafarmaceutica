@@ -384,7 +384,7 @@ class _CalculatorHomeState extends State<CalculatorHome> with WidgetsBindingObse
                   return SliverList.separated(
                     itemCount: visible.length,
                     itemBuilder: (context, i) => _calculatorCard(visible[i], scheme),
-                    separatorBuilder: (_, _) => const SizedBox(height: 12),
+                    separatorBuilder: (context, index) => const SizedBox(height: 12),
                   );
                 }),
               ),
@@ -406,21 +406,21 @@ class _CalculatorHomeState extends State<CalculatorHome> with WidgetsBindingObse
           colors: [Color(0xFF104449), Color(0xFF24245D), Color(0xFF10213B)],
         ),
       ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Row(children: [
+      child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
           Icon(Icons.science_rounded, color: _aqua, size: 18),
           SizedBox(width: 8),
           Text('LABORATÓRIO • QUALIDADE • PRODUÇÃO',
               style: TextStyle(color: _aqua, fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 0.8)),
         ]),
-        const SizedBox(height: 16),
-        const Text('Precisão em cada cálculo.',
+        SizedBox(height: 16),
+        Text('Precisão em cada cálculo.',
             style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 9),
-        const Text('21 ferramentas, fórmulas explicadas e resultados instantâneos. Funciona offline.',
+        SizedBox(height: 9),
+        Text('21 ferramentas, fórmulas explicadas e resultados instantâneos. Funciona offline.',
             style: TextStyle(color: Color(0xFFE2E7FA), fontSize: 14, height: 1.5)),
-        const SizedBox(height: 14),
-        const Row(children: [
+        SizedBox(height: 14),
+        Row(children: [
           Icon(Icons.shield_outlined, color: Color(0xFFB3EAFF), size: 16),
           SizedBox(width: 8),
           Expanded(child: Text('Apoio técnico — exige conferência e validação para uso regulado.',
@@ -687,8 +687,11 @@ class _CalculatorDetailState extends State<CalculatorDetail> {
           label: const Text('Copiar cálculo e dados'),
           onPressed: () async {
             await Clipboard.setData(ClipboardData(text: export.toString()));
-            if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Cálculo copiado para a área de transferência.')));
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Cálculo copiado para a área de transferência.')),
+              );
+            }
           },
         ),
       ]),

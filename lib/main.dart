@@ -1,8 +1,13 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'domain/calculator.dart';
+import 'services/update_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -75,6 +80,8 @@ class _CalculatorHomeState extends State<CalculatorHome> {
   static const _favoritesKey = 'favorite_calculator_ids_v1';
   final _search = TextEditingController();
   final Set<String> _favorites = {};
+  final UpdateService _updates = UpdateService();
+  bool _checkingForUpdates = false;
   CalculatorCategory? _category;
   bool _onlyFavorites = false;
 
@@ -82,7 +89,131 @@ class _CalculatorHomeState extends State<CalculatorHome> {
   void initState() {
     super.initState();
     _loadFavorites();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_checkForUpdates(automatic: true));
+    });
     _search.addListener(() { if (mounted) setState(() {}); });
+  }
+
+  Future<void> _checkForUpdates({required bool automatic}) async {
+    if (_checkingForUpdates) return;
+    _checkingForUpdates = true;
+    try {
+      final release = await _updates.latestAvailable();
+      if (!mounted) return;
+      if (release == null) {
+        if (!automatic) _message('Você já está na versão mais recente.');
+        return;
+      }
+      final shouldUpdate = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Nova versão disponível'),
+          content: Column(mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('AURORA ${release.version} já está disponível.'),
+            const SizedBox(height: 8),
+            const Text('Deseja atualizar agora?'),
+            if (release.description.trim().isNotEmpty) ...[
+              const SizedBox(height: 12),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 160),
+                child: SingleChildScrollView(child: Text(release.description,
+                  style: const TextStyle(fontSize: 12))),
+              ),
+            ],
+            if (Platform.isIOS) ...[
+              const SizedBox(height: 10),
+              const Text('No iPhone, a instalação deve seguir o canal '
+                  'de distribuição Apple. A página informa as novidades.',
+                  style: TextStyle(fontSize: 12)),
+            ],
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Agora não')),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, true),
+              child: Text(Platform.isAndroid ? 'Baixar e instalar' : 'Ver novidades')),
+          ],
+        ),
+      );
+      if (!mounted || shouldUpdate != true) return;
+      if (Platform.isAndroid) {
+        await _downloadAndInstall(release);
+      } else {
+        await launchUrl(release.pageUrl, mode: LaunchMode.externalApplication);
+      }
+    } on UpdateException catch (error) {
+      if (!automatic && mounted) _message(error.message);
+    } catch (_) {
+      if (!automatic && mounted) {
+        _message('Não foi possível verificar atualizações. Confira a internet.');
+      }
+    } finally {
+      _checkingForUpdates = false;
+    }
+  }
+
+  Future<void> _downloadAndInstall(AppRelease release) async {
+    final progress = ValueNotifier<double?>(null);
+    // Modal permanece visível até concluir a verificação SHA-256.
+    unawaited(showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          title: const Text('Baixando atualização'),
+          content: ValueListenableBuilder<double?>(
+            valueListenable: progress,
+            builder: (_, value, __) => Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                LinearProgressIndicator(value: value),
+                const SizedBox(height: 14),
+                Text(value == null ? 'Download e verificação de segurança…'
+                    : '${(value * 100).toStringAsFixed(0)}% concluído'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ));
+    // Permite que o diálogo seja desenhado antes de iniciar a transferência.
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+    try {
+      final apk = await _updates.downloadVerifiedApk(release,
+        onProgress: (received, total) {
+          if (total > 0 && received <= total) {
+            progress.value = received / total;
+          }
+        },
+      );
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      await _updates.requestInstallation(apk);
+    } on UpdateException catch (error) {
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        _message(error.message);
+      }
+    } catch (_) {
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        _message('Falha ao baixar ou abrir o APK. Tente novamente.');
+      }
+    } finally {
+      // Destroy after the dialog is removed to avoid listener usage after dispose.
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      progress.dispose();
+    }
+  }
+
+  void _message(String value) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(value)),
+    );
   }
 
   Future<void> _loadFavorites() async {
@@ -102,6 +233,7 @@ class _CalculatorHomeState extends State<CalculatorHome> {
   @override
   void dispose() {
     _search.dispose();
+    _updates.dispose();
     super.dispose();
   }
 
@@ -133,12 +265,17 @@ class _CalculatorHomeState extends State<CalculatorHome> {
         ]),
         actions: [
           IconButton(
+            tooltip: 'Verificar atualizações',
+            icon: const Icon(Icons.system_update_alt_rounded),
+            onPressed: () => _checkForUpdates(automatic: false),
+          ),
+          IconButton(
             tooltip: 'Sobre e segurança',
             icon: const Icon(Icons.info_outline),
             onPressed: () => showAboutDialog(
               context: context,
               applicationName: 'AURORA Calculadora Farmacêutica',
-              applicationVersion: '0.1.0',
+              applicationVersion: '0.2.0',
               children: [
                 const Text('Ferramenta educacional e de apoio técnico. Não validada para liberação de lotes, decisão clínica ou substituição de métodos e procedimentos aprovados.'),
                 const SizedBox(height: 10),

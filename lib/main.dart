@@ -76,7 +76,7 @@ class CalculatorHome extends StatefulWidget {
   State<CalculatorHome> createState() => _CalculatorHomeState();
 }
 
-class _CalculatorHomeState extends State<CalculatorHome> {
+class _CalculatorHomeState extends State<CalculatorHome> with WidgetsBindingObserver {
   static const _favoritesKey = 'favorite_calculator_ids_v1';
   final _search = TextEditingController();
   final Set<String> _favorites = {};
@@ -89,10 +89,19 @@ class _CalculatorHomeState extends State<CalculatorHome> {
   void initState() {
     super.initState();
     _loadFavorites();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) unawaited(_checkForUpdates(automatic: true));
     });
     _search.addListener(() { if (mounted) setState(() {}); });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_checkForUpdates(automatic: true));
+    }
   }
 
   Future<void> _checkForUpdates({required bool automatic}) async {
@@ -236,6 +245,7 @@ class _CalculatorHomeState extends State<CalculatorHome> {
   @override
   void dispose() {
     _search.dispose();
+    WidgetsBinding.instance.removeObserver(this);
     _updates.dispose();
     super.dispose();
   }

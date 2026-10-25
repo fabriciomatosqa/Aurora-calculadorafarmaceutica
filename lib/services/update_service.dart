@@ -222,7 +222,7 @@ class UpdateService {
     if (url == null) {
       throw const UpdateException('A versão não contém APK compatível.');
     }
-    String? expectedSha = release.digest;
+    String? expectedSha = release.sha256 ?? release.digest;
     if (expectedSha == null) {
       final checksumUrl = release.sha256Url;
       if (checksumUrl == null) {
@@ -265,7 +265,8 @@ class UpdateService {
       await sink.close();
       sinkClosed = true;
       final checksum = await sha256.bind(file.openRead()).first;
-      if (checksum.toString().toLowerCase() != expectedSha) {
+      if ((release.size > 0 && received != release.size) ||
+          checksum.toString().toLowerCase() != expectedSha) {
         throw const UpdateException('Verificação SHA-256 falhou. APK descartado.');
       }
       return file;
@@ -276,9 +277,28 @@ class UpdateService {
     }
   }
 
-  Future<void> requestInstallation(File apk) async {
+  Future<void> requestInstallation(File apk, {required AppRelease release}) async {
     if (!Platform.isAndroid) {
-      throw const UpdateException('O iOS não permite instalar um APK.');
+      throw const UpdateException('Instalação disponível apenas no Android.');
+    }
+    if (release.versionCode == null || release.packageName == null) {
+      throw const UpdateException('Manifesto sem identificação do APK.');
+    }
+    try {
+      final allowed = await _nativeVerifier.invokeMethod<bool>(
+        'validateApk',
+        {
+          'path': apk.path,
+          'versionCode': release.versionCode,
+          'packageName': release.packageName,
+        },
+      );
+      if (allowed != true) {
+        throw const UpdateException('O APK não passou na verificação Android.');
+      }
+    } on PlatformException catch (e) {
+      throw UpdateException(e.message ??
+          'O APK tem versão ou assinatura incompatível com o app instalado.');
     }
     final result = await OpenFilex.open(
       apk.path, type: 'application/vnd.android.package-archive',

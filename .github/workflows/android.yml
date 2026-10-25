@@ -115,7 +115,7 @@ jobs:
             echo "::error::ID do pacote mudou: atualizações sobre instalações antigas serão recusadas"
             exit 1
           fi
-          EXPECTED_BUILD="${GITHUB_REF_NAME:+$(sed -n 's/^version: [^+]*+\\([0-9][0-9]*\\).*/\\1/p' pubspec.yaml)}"
+          EXPECTED_BUILD="$(sed -n 's/^version: [^+]*+\\([0-9][0-9]*\\).*/\\1/p' pubspec.yaml)"
           if [[ -z "$EXPECTED_BUILD" || "$VERSION_CODE" != "$EXPECTED_BUILD" ]]; then
             echo "::error::versionCode APK ($VERSION_CODE) difere do pubspec ($EXPECTED_BUILD)"
             exit 1

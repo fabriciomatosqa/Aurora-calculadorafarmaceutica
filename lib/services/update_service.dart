@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:open_filex/open_filex.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
@@ -121,6 +122,15 @@ class UpdateService {
       _installedVersionOverride ?? (await PackageInfo.fromPlatform()).version;
 
   Future<AppRelease?> latestAvailable() async {
+    if (!kReleaseMode && _installedVersionOverride == null) {
+      throw const UpdateException(
+        'Esta instalação é um APK de testes (DEBUG). '
+        'APKs de teste não podem substituir a versão oficial assinada. '
+        'Antes de migrar para um Release, preserve os dados do aplicativo. '
+        'Depois da primeira instalação oficial, as próximas atualizações '
+        'serão realizadas diretamente no AURORA.',
+      );
+    }
     final current = await installedVersion();
     final uri = Uri.https('api.github.com',
         '/repos/$updateRepository/releases/latest');

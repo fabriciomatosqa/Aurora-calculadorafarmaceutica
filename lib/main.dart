@@ -508,7 +508,7 @@ class _CalculatorHomeState extends State<CalculatorHome> with WidgetsBindingObse
           colors: [Color(0xFF104449), Color(0xFF24245D), Color(0xFF10213B)],
         ),
       ),
-      child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Icon(Icons.science_rounded, color: _aqua, size: 18),
           SizedBox(width: 8),
@@ -522,12 +522,19 @@ class _CalculatorHomeState extends State<CalculatorHome> with WidgetsBindingObse
         Text('22 calculadoras, leitura de prescrição por foto e resultados locais.',
             style: TextStyle(color: Color(0xFFE2E7FA), fontSize: 14, height: 1.5)),
         SizedBox(height: 14),
-        Row(children: [
+        const Row(children: [
           Icon(Icons.shield_outlined, color: Color(0xFFB3EAFF), size: 16),
           SizedBox(width: 8),
           Expanded(child: Text('Apoio técnico — exige conferência e validação para uso regulado.',
               style: TextStyle(color: Color(0xFFC6D5EE), fontSize: 12))),
         ]),
+        const SizedBox(height: 17),
+        FilledButton.icon(
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => const PrescriptionScreen())),
+          icon: const Icon(Icons.document_scanner_outlined),
+          label: const Text('Ler uma prescrição por foto'),
+        ),
       ]),
     );
   }

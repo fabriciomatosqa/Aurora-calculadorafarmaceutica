@@ -4,6 +4,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../domain/calculator.dart';
 import '../../domain/prescription.dart';
+import 'prescription_document_reader.dart';
+import 'prescription_text_hints.dart';
 
 /// Fixed-schedule prescription quantity aid for pharmacists.
 /// Not a clinical prescribing or drug-database application.
@@ -24,6 +26,11 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
   final _maximum = TextEditingController();
   final _reference = TextEditingController();
   final _package = TextEditingController();
+  final _prescriptionText = TextEditingController();
+  final _documentReader = PrescriptionDocumentReader();
+  String? _selectedFileName;
+  String? _importMessage;
+  bool _importBusy = false;
   PrescriptionCalculation? _result;
   String? _error;
 
@@ -31,10 +38,217 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
   void dispose() {
     for (final controller in [
       _name, _strength, _dose, _times, _days, _maximum, _reference, _package,
+      _prescriptionText,
     ]) {
       controller.dispose();
     }
     super.dispose();
+  }
+
+  Future<void> _importPrescription(
+    Future<PrescriptionDocument?> Function() pick,
+  ) async {
+    if (_importBusy) return;
+    setState(() {
+      _importBusy = true;
+      _importMessage = null;
+      _result = null;
+    });
+    try {
+      final imported = await pick();
+      if (!mounted || imported == null) return;
+      setState(() {
+        _selectedFileName = imported.name;
+        _prescriptionText.text = imported.text;
+        _importMessage = imported.fromOcr
+            ? 'Leitura OCR concluída. Pode conter erros: revise cada palavra, '
+              'dose e unidade antes de prosseguir.'
+            : 'Texto do PDF extraído. Confira com o documento original.';
+      });
+    } on PrescriptionReadException catch (error) {
+      if (mounted) setState(() => _importMessage = error.message);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _importMessage =
+            'Não foi possível abrir ou ler este arquivo. Tente outra imagem '
+            'ou um PDF com texto selecionável.');
+      }
+    } finally {
+      if (mounted) setState(() => _importBusy = false);
+    }
+  }
+
+  Future<void> _reviewExtractedFields() async {
+    final source = _prescriptionText.text.trim();
+    if (source.isEmpty) {
+      setState(() => _importMessage =
+          'Envie uma imagem, arquivo PDF ou cole o texto da prescrição.');
+      return;
+    }
+    final suggestions = suggestPrescriptionFields(source);
+    if (suggestions.isEmpty) {
+      setState(() => _importMessage =
+          'Não foi possível identificar campos com segurança. '
+          'Transcreva os valores manualmente abaixo.');
+      return;
+    }
+    final details = <String>[
+      if (suggestions.form != null)
+        'Forma: ${suggestions.form!.label}',
+      if (suggestions.strengthMg != null)
+        'Apresentação: ${formatValue(suggestions.strengthMg!)} '
+          '${suggestions.form?.strengthUnit ?? 'mg/unidade'}',
+      if (suggestions.doseMg != null)
+        'Dose por tomada: ${formatValue(suggestions.doseMg!)} mg',
+      if (suggestions.administrationsPerDay != null)
+        'Frequência: ${suggestions.administrationsPerDay} tomadas/dia',
+      if (suggestions.durationDays != null)
+        'Duração: ${suggestions.durationDays} dias',
+    ];
+    final approve = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Confirmar dados extraídos'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Esses dados são apenas sugestões. Compare com a prescrição '
+                'original antes de transferir aos campos:',
+              ),
+              const SizedBox(height: 14),
+              ...details.map((item) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text('• $item'),
+              )),
+              const SizedBox(height: 12),
+              const Text(
+                'A dose máxima diária e sua referência NÃO serão preenchidas '
+                'automaticamente. Somente o profissional pode verificá-las.',
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Revisar texto'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Aplicar sugestões'),
+          ),
+        ],
+      ),
+    );
+    if (approve != true || !mounted) return;
+    setState(() {
+      if (suggestions.form != null) _form = suggestions.form!;
+      if (suggestions.strengthMg != null) {
+        _strength.text = formatValue(suggestions.strengthMg!);
+      }
+      if (suggestions.doseMg != null) {
+        _dose.text = formatValue(suggestions.doseMg!);
+      }
+      if (suggestions.administrationsPerDay != null) {
+        _times.text = '${suggestions.administrationsPerDay}';
+      }
+      if (suggestions.durationDays != null) {
+        _days.text = '${suggestions.durationDays}';
+      }
+      _result = null;
+      _error = null;
+      _importMessage = 'Sugestões aplicadas. Confira TODOS os campos e '
+          'preencha o limite diário com uma fonte oficial antes do cálculo.';
+    });
+  }
+
+  Widget _documentImportPanel() {
+    final scheme = Theme.of(context).colorScheme;
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Icon(Icons.document_scanner_outlined, color: scheme.primary),
+              const SizedBox(width: 10),
+              Expanded(child: Text('1. IMPORTAR PRESCRIÇÃO',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ))),
+            ]),
+            const SizedBox(height: 8),
+            const Text('Selecione uma imagem ou PDF para extrair o texto no '
+              'próprio aparelho. Nenhum documento é enviado a um servidor.'),
+            const SizedBox(height: 14),
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              FilledButton.icon(
+                onPressed: _importBusy ? null : () =>
+                  _importPrescription(_documentReader.fromCamera),
+                icon: const Icon(Icons.photo_camera_outlined),
+                label: const Text('Tirar foto'),
+              ),
+              OutlinedButton.icon(
+                onPressed: _importBusy ? null : () =>
+                  _importPrescription(_documentReader.fromGallery),
+                icon: const Icon(Icons.photo_library_outlined),
+                label: const Text('Galeria'),
+              ),
+              OutlinedButton.icon(
+                onPressed: _importBusy ? null : () =>
+                  _importPrescription(_documentReader.fromFile),
+                icon: const Icon(Icons.attach_file_outlined),
+                label: const Text('Arquivo / PDF'),
+              ),
+            ]),
+            if (_importBusy) ...[
+              const SizedBox(height: 12),
+              const LinearProgressIndicator(),
+              const SizedBox(height: 5),
+              const Text('Lendo o documento no aparelho...'),
+            ],
+            if (_selectedFileName != null) ...[
+              const SizedBox(height: 12),
+              Text('Arquivo selecionado: $_selectedFileName',
+                style: TextStyle(color: scheme.primary)),
+            ],
+            if (_importMessage != null) ...[
+              const SizedBox(height: 12),
+              _warning(_importMessage!),
+            ],
+            const SizedBox(height: 14),
+            TextField(
+              controller: _prescriptionText,
+              maxLines: 7,
+              minLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'Texto da prescrição (editável)',
+                alignLabelWithHint: true,
+                hintText: 'O texto extraído aparecerá aqui. '
+                  'Também pode ser digitado ou colado manualmente.',
+              ),
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: _importBusy ? null : _reviewExtractedFields,
+              icon: const Icon(Icons.fact_check_outlined),
+              label: const Text('Conferir e sugerir preenchimento'),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'OCR pode confundir 1/I, 0/O e mg/mL. Compare sempre '
+              'com o documento original. Este app não aprova prescrições.',
+              style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   int _wholeNumber(String raw, String field) {
@@ -277,6 +491,8 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
               Text('Quantidade para a prescrição',
                 style: Theme.of(context).textTheme.headlineSmall),
               const SizedBox(height: 12),
+              _documentImportPanel(),
+              const SizedBox(height: 14),
               _warning(
                 'Apoio matemático, não avaliação clínica automática. '
                 'Não contempla doses se necessário (SOS), redução progressiva, '

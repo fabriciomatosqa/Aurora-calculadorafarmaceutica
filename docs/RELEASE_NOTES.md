@@ -1,18 +1,26 @@
-# AURORA Calculadora Farmacêutica v0.6.1 — Android
+# AURORA Calculadora Farmacêutica v0.6.2 — Android
 
-## Correções desta versão
+## Correção do sistema de atualizações
 
-- Corrige erro na compilação Android causado pela incompatibilidade do file_picker 11.0.3 com Android Gradle Plugin 9.
-- Atualiza o seletor de documentos para file_picker 12.3.x, com suporte a PDF, JPG, JPEG e PNG.
-- Corrige acesso a arquivos selecionados pelo Android Storage Access Framework (SAF), processando-os temporariamente em armazenamento privado e removendo a cópia após o uso.
-- Mantém em Prescrições os três botões evidentes: Tirar foto, Galeria e Arquivo / PDF, com revisão obrigatória dos campos extraídos.
-- Mantém Favoritos como a primeira aba.
-- A checagem de atualização permanece integrada ao aplicativo e consulta as Releases oficiais do GitHub, com download interno, conferência do SHA-256 e abertura do instalador Android.
+- Resolve a origem dos conflitos entre APKs de depuração gerados em máquinas diferentes do GitHub Actions: builds DEBUG agora usam um **identificador separado** (`.debug`) e não tentam substituir o aplicativo oficial.
+- O APK de produção continua com o mesmo identificador permanente `br.com.aurora.aurora_calculadora_farmaceutica` e exige assinatura estável por keystore nos Secrets do GitHub Actions.
+- A publicação do Release agora verifica **identificador do pacote, versionCode e assinatura digital**, registra a impressão digital SHA-256 do certificado e inclui esse relatório entre os arquivos da Release.
+- Sem chave permanente configurada, o workflow sinaliza falha de distribuição, em vez de informar sucesso como se houvesse uma atualização disponível.
+- O app de desenvolvimento passa a informar que um APK DEBUG não pode seguir o canal de atualizações oficiais.
+- O fluxo para instalações oficiais continua integrado: consulta GitHub Releases no app, mostra novidades, baixa APK, verifica SHA-256 e abre o instalador Android.
 
-## Segurança e implantação
+## Funcionalidades mantidas
 
-As prescrições são processadas no aparelho. A leitura automática não valida a receita nem define a dose máxima. Os campos extraídos exigem revisão profissional.
+- Prescrições: importar foto, galeria, PDF ou imagem, revisar texto por OCR local e confirmar os dados antes do cálculo.
+- Favoritos como a primeira aba do catálogo.
+- 22 ferramentas para cálculos farmacêuticos.
 
-A atualização sobre uma instalação Android existente depende de assinatura e identificador de pacote compatíveis; a implantação do Release requer secrets de assinatura corretamente configurados no GitHub Actions.
+## Migração de instalações anteriores
 
-**Atenção:** aplicação técnica ainda sem validação para atividades farmacêuticas regulamentadas.
+**Não é possível atualizar sobre uma instalação Android que use certificado de assinatura diferente.** Instalações criadas com `app-debug.apk` dos antigos Artifacts poderão exigir uma **migração única** para a versão Release assinada com a chave definitiva.
+
+**Antes de qualquer desinstalação, preserve seus dados locais.** A remoção do app pode apagar favoritos e configurações. Se a chave original ainda estiver disponível, assinar o novo APK com ela pode permitir a atualização sem reinstalar; caso contrário, o Android bloqueará a substituição. O aplicativo não pode desativar essa verificação de segurança.
+
+Não use o APK DEBUG dos Artifacts como versão de atualização. Use apenas o APK de uma Release oficial assinada e verificada. A confirmação de instalação pelo Android é obrigatória.
+
+Uso farmacêutico regulamentado exige validação técnica e profissional independente.

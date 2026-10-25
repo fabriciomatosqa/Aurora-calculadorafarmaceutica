@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart' show kReleaseMode;
+import 'package:flutter/services.dart' show MethodChannel, PlatformException;
 import 'package:open_filex/open_filex.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
@@ -20,6 +21,12 @@ class AppRelease {
     required this.pageUrl,
     required this.apkUrl,
     required this.sha256Url,
+    this.manifestUrl,
+    this.versionCode,
+    this.packageName,
+    this.minSdk,
+    this.signingCertSha256,
+    this.sha256,
     this.digest,
     this.size = 0,
   });
@@ -29,6 +36,12 @@ class AppRelease {
   final Uri pageUrl;
   final Uri? apkUrl;
   final Uri? sha256Url;
+  final Uri? manifestUrl;
+  final int? versionCode;
+  final String? packageName;
+  final int? minSdk;
+  final String? signingCertSha256;
+  final String? sha256;
   final String? digest;
   final int size;
 }
@@ -81,16 +94,24 @@ AppRelease parseRelease(Map<String, dynamic> json) {
   final apkName = 'aurora-calculadora-farmaceutica-${tag.replaceFirst(RegExp(r'^v'), 'v')}-android.apk';
   Map<String, dynamic>? apk;
   Map<String, dynamic>? checksum;
+  Map<String, dynamic>? manifest;
   for (final item in assets) {
     if (item is! Map<String, dynamic>) continue;
     if (item['name'] == apkName) apk = item;
     if (item['name'] == '$apkName.sha256') checksum = item;
+    if (item['name'] == 'aurora-update.json') manifest = item;
   }
   Uri? assetUrl(Map<String, dynamic>? asset) {
     if (asset == null) return null;
     final url = asset['browser_download_url'];
     if (url is! String) throw const UpdateException('Asset sem link de download.');
-    return _secureUrl(url, githubAsset: true);
+    final parsed = _secureUrl(url, githubAsset: true);
+    final expected = '/$updateRepository/releases/download/$tag/${asset['name']}';
+    if (parsed.path != expected || parsed.hasQuery || parsed.hasFragment ||
+        parsed.userInfo.isNotEmpty || parsed.hasPort) {
+      throw const UpdateException('Asset fora do Release oficial.');
+    }
+    return parsed;
   }
   final sha = apk?['digest'];
   return AppRelease(
@@ -99,6 +120,7 @@ AppRelease parseRelease(Map<String, dynamic> json) {
     pageUrl: _secureUrl(page, githubAsset: true),
     apkUrl: assetUrl(apk),
     sha256Url: assetUrl(checksum),
+    manifestUrl: assetUrl(manifest),
     digest: sha is String && RegExp(r'^sha256:[a-fA-F0-9]{64}$').hasMatch(sha)
         ? sha.substring(7).toLowerCase() : null,
     size: apk?['size'] is int ? apk!['size'] as int : 0,
@@ -113,7 +135,8 @@ class UpdateService {
   final http.Client _client;
   final String? _installedVersionOverride;
 
-  static const _maxApkBytes = 150 * 1024 * 1024;
+  static const _maxApkBytes = 512 * 1024 * 1024;
+  static const _nativeVerifier = MethodChannel('aurora/android_update');
   static const _timeout = Duration(seconds: 20);
 
   void dispose() => _client.close();

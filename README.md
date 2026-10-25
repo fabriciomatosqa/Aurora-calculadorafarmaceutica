@@ -2,7 +2,7 @@
 
 Aplicativo Flutter com foco exclusivo na versão **Android**, em português, com **22 calculadoras** para soluções, qualidade, produção e avaliação matemática de prescrições. Os cálculos funcionam offline; inclui interface clara/escura, pesquisa, favoritos locais e cópia de resultados. O iOS está fora das prioridades de desenvolvimento.
 
-> **ATENÇÃO — Protótipo técnico v0.3.0.** Não validado para uso em ambiente regulado, decisão clínica, liberação/reprovação de lotes ou substituição de POPs e métodos aprovados. Toda fórmula, unidade, precisão, arredondamento, faixa, rastreabilidade e condição de aplicação deve ser avaliada pelo responsável técnico antes do uso operacional. Nenhum resultado determina conformidade.
+> **ATENÇÃO — Protótipo técnico v0.4.0.** Não validado para uso em ambiente regulado, decisão clínica, liberação/reprovação de lotes ou substituição de POPs e métodos aprovados. Toda fórmula, unidade, precisão, arredondamento, faixa, rastreabilidade e condição de aplicação deve ser avaliada pelo responsável técnico antes do uso operacional. Nenhum resultado determina conformidade.
 
 ## Calculadoras
 
@@ -14,7 +14,7 @@ Aplicativo Flutter com foco exclusivo na versão **Android**, em português, com
 
 **Prescrições (1):** quantidade de comprimidos/cápsulas/sachês inteiros ou volume de líquidos orais para tratamento de dose fixa; comparação da dose diária calculada com limite *informado* e estimativa opcional de embalagens. Veja [regras, validações, limitações e fontes](docs/PRESCRICOES.md).
 
-Cada tela informa unidades fixas, fórmula e limitações. Valores monetários ou clínicos não fazem parte do escopo da versão 0.3.0. Em DPR, separar medições por ponto e vírgula ou linhas (vírgula pode ser separador decimal).
+Cada tela informa unidades fixas, fórmula e limitações. Valores monetários ou clínicos não fazem parte do escopo da versão 0.4.0. Em DPR, separar medições por ponto e vírgula ou linhas (vírgula pode ser separador decimal).
 
 ## Android — construir e obter APK
 
@@ -35,17 +35,15 @@ flutter build apk --debug
 
 Saída típica: `build/app/outputs/flutter-apk/app-debug.apk`.
 
-## Atualização pelo aplicativo (v0.3.0)
+## Atualização diretamente pelo Android (v0.4.0)
 
-O app verifica automaticamente a existência de uma nova versão no GitHub **toda vez que a tela inicial abre**, sem travar cálculos offline. Também há um botão **Verificar atualizações** no topo.
+O aplicativo verifica atualizações públicas ao abrir e ao voltar ao primeiro plano; também oferece os ícones **Verificar atualizações** e **Configurar atualizações**. Quando identifica uma versão mais recente, mostra notas, pergunta se deseja atualizar, baixa o APK com indicador de progresso, valida SHA-256 e abre o instalador Android com confirmação do usuário. Os cálculos continuam disponíveis offline, sem exigir login no GitHub.
 
-Quando uma nova Release pública está disponível, ele pergunta se deseja atualizar. No Android, baixa o APK, verifica SHA-256, e abre o instalador do Android mediante autorização. O instalador não é silencioso. No iOS, abre apenas as novidades; a instalação real deve ocorrer pela App Store ou TestFlight.
+**Distribuição ainda depende da configuração inicial pelo proprietário:** o código está em repositório privado e não pode ser consultado anonimamente. O AURORA consulta por padrão o canal PÚBLICO `fabriciomatosqa/aurora-calculadora-farmaceutica-updates`, que precisa ser criado. A CI publica lá apenas APKs assinados e arquivos SHA-256, após a configuração de uma chave persistente e de permissões de publicação restritas.
 
-**Atenção: este repositório está PRIVADO.** Releases privados não são acessíveis por um APK sem autenticação. Para ativar o verificador no celular, é necessário tornar público o repositório de distribuição (este ou outro) e disponibilizar nele as Releases. Tokens GitHub não devem ser incluídos no código.
+**Não existe instalação silenciosa.** Releases privados, APKs debug e Artifacts não são substitutos de uma Release pública assinada. Se o aparelho usa APK debug com outra chave, poderá ser necessário fazer backup e instalar a versão release limpa uma única vez.
 
-**Assinatura:** a CI publica APK de teste, mas a atualização sobre uma instalação já existente exige a mesma chave de assinatura. Para gerar APK release assinável, é necessário configurar os quatro secrets de assinatura no GitHub; sem eles, a workflow **não publica Release**.
-
-Leia **[Configuração do atualizador, assinatura e distribuição](docs/ATUALIZACOES.md)** antes de instalar a primeira versão.
+Configuração detalhada: **[Atualizações Android — criação do canal público e assinatura](docs/ATUALIZACOES.md)**.
 
 ## iOS — fora de escopo no momento
 

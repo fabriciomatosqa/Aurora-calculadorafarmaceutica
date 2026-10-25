@@ -2,7 +2,7 @@
 
 Aplicativo Flutter com foco exclusivo na versão **Android**, em português, com **22 calculadoras** para soluções, qualidade, produção e avaliação matemática de prescrições. Os cálculos funcionam offline; inclui interface clara/escura, pesquisa, favoritos locais e cópia de resultados. O iOS está fora das prioridades de desenvolvimento.
 
-> **ATENÇÃO — Protótipo técnico v0.4.0.** Não validado para uso em ambiente regulado, decisão clínica, liberação/reprovação de lotes ou substituição de POPs e métodos aprovados. Toda fórmula, unidade, precisão, arredondamento, faixa, rastreabilidade e condição de aplicação deve ser avaliada pelo responsável técnico antes do uso operacional. Nenhum resultado determina conformidade.
+> **ATENÇÃO — Protótipo técnico v0.5.0.** Não validado para uso em ambiente regulado, decisão clínica, liberação/reprovação de lotes ou substituição de POPs e métodos aprovados. Toda fórmula, unidade, precisão, arredondamento, faixa, rastreabilidade e condição de aplicação deve ser avaliada pelo responsável técnico antes do uso operacional. Nenhum resultado determina conformidade.
 
 ## Calculadoras
 
@@ -14,7 +14,7 @@ Aplicativo Flutter com foco exclusivo na versão **Android**, em português, com
 
 **Prescrições (1):** quantidade de comprimidos/cápsulas/sachês inteiros ou volume de líquidos orais para tratamento de dose fixa; comparação da dose diária calculada com limite *informado* e estimativa opcional de embalagens. Veja [regras, validações, limitações e fontes](docs/PRESCRICOES.md).
 
-Cada tela informa unidades fixas, fórmula e limitações. Valores monetários ou clínicos não fazem parte do escopo da versão 0.4.0. Em DPR, separar medições por ponto e vírgula ou linhas (vírgula pode ser separador decimal).
+Cada tela informa unidades fixas, fórmula e limitações. Valores monetários ou clínicos não fazem parte do escopo da versão 0.5.0. Em DPR, separar medições por ponto e vírgula ou linhas (vírgula pode ser separador decimal).
 
 ## Android — construir e obter APK
 
@@ -35,15 +35,15 @@ flutter build apk --debug
 
 Saída típica: `build/app/outputs/flutter-apk/app-debug.apk`.
 
-## Atualização diretamente pelo Android (v0.4.0)
+## Atualização online pelo próprio app Android (v0.5.0)
 
-O aplicativo verifica atualizações públicas ao abrir e ao voltar ao primeiro plano; também oferece os ícones **Verificar atualizações** e **Configurar atualizações**. Quando identifica uma versão mais recente, mostra notas, pergunta se deseja atualizar, baixa o APK com indicador de progresso, valida SHA-256 e abre o instalador Android com confirmação do usuário. Os cálculos continuam disponíveis offline, sem exigir login no GitHub.
+O repositório oficial agora é **PÚBLICO**. O aplicativo consulta os [Releases do próprio repositório](https://github.com/fabriciomatosqa/Aurora-calculadorafarmaceutica/releases) ao iniciar e ao retornar ao primeiro plano, além do botão de verificação no topo. Nenhuma configuração de outro repositório, credencial ou download manual pelo GitHub é necessária **para versões release assinadas compatíveis**.
 
-**Distribuição ainda depende da configuração inicial pelo proprietário:** o código está em repositório privado e não pode ser consultado anonimamente. O AURORA consulta por padrão o canal PÚBLICO `fabriciomatosqa/aurora-calculadora-farmaceutica-updates`, que precisa ser criado. A CI publica lá apenas APKs assinados e arquivos SHA-256, após a configuração de uma chave persistente e de permissões de publicação restritas.
+Se houver uma atualização, o app mostra a versão e as notas, pergunta se deseja instalar, baixa o APK internamente, verifica seu SHA-256 e abre o instalador do Android. A confirmação do usuário continua obrigatória: não é uma instalação silenciosa.
 
-**Não existe instalação silenciosa.** Releases privados, APKs debug e Artifacts não são substitutos de uma Release pública assinada. Se o aparelho usa APK debug com outra chave, poderá ser necessário fazer backup e instalar a versão release limpa uma única vez.
+**Para o primeiro Release funcionar**, o proprietário ainda precisa configurar a **assinatura Android permanente** (quatro Actions Secrets). O workflow `.github/workflows/android.yml` publica um APK release no próprio repositório, somente depois de validação e compilação bem-sucedidas. Sem esses secrets, apenas APK debug estará disponível como Actions Artifact — não como Release de atualização. Um APK release pode exigir reinstalação inicial se a versão atual usa assinatura debug diferente.
 
-Configuração detalhada: **[Atualizações Android — criação do canal público e assinatura](docs/ATUALIZACOES.md)**.
+Veja [configuração da assinatura, publicação e testes de atualização](docs/ATUALIZACOES.md).
 
 ## iOS — fora de escopo no momento
 

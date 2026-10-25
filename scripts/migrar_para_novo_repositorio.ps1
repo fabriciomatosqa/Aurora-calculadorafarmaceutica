@@ -92,7 +92,7 @@ try {
 
   # Bump da versao sem alterar applicationId/certificado Android.
   $pubspec = Ler-Arquivo 'pubspec.yaml'
-  $padrao = [regex]'(?m)^version:\s*(\d+)\.(\d+)\.(\d+)\+(\d+)\s*$'
+  $padrao = [regex]'(?m)^version: *(\d+)\.(\d+)\.(\d+)\+(\d+) *(?=\r?$)'
   $achado = $padrao.Match($pubspec)
   if (-not $achado.Success) { throw 'Versao nao encontrada no pubspec.yaml.' }
   $novoMajor = [int]$achado.Groups[1].Value

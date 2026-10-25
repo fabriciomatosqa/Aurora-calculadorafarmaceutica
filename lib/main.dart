@@ -44,8 +44,20 @@ class AuroraApp extends StatelessWidget {
           foregroundColor: scheme.onSurface,
         ),
         cardTheme: CardThemeData(
-          color: scheme.surface, elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          color: scheme.surface, elevation: 0, clipBehavior: Clip.antiAlias,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20),
+            side: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.45))),
+        ),
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
+            textStyle: const TextStyle(fontWeight: FontWeight.w700)),
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13))),
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
@@ -85,6 +97,8 @@ class CalculatorHome extends StatefulWidget {
 class _CalculatorHomeState extends State<CalculatorHome> with WidgetsBindingObserver {
   static const _favoritesKey = 'favorite_calculator_ids_v1';
   final _search = TextEditingController();
+  Timer? _searchDebounce;
+  DateTime? _lastAutomaticCheck;
   final Set<String> _favorites = {};
   final UpdateService _updates = UpdateService();
   bool _checkingForUpdates = false;
@@ -101,7 +115,12 @@ class _CalculatorHomeState extends State<CalculatorHome> with WidgetsBindingObse
         if (mounted) unawaited(_checkForUpdates(automatic: true));
       });
     }
-    _search.addListener(() { if (mounted) setState(() {}); });
+    _search.addListener(() {
+      _searchDebounce?.cancel();
+      _searchDebounce = Timer(const Duration(milliseconds: 170), () {
+        if (mounted) setState(() {});
+      });
+    });
   }
 
   @override
@@ -181,6 +200,14 @@ class _CalculatorHomeState extends State<CalculatorHome> with WidgetsBindingObse
 
   Future<void> _checkForUpdates({required bool automatic}) async {
     if (_checkingForUpdates) return;
+    if (automatic) {
+      final now = DateTime.now();
+      if (_lastAutomaticCheck != null &&
+          now.difference(_lastAutomaticCheck!) < const Duration(hours: 3)) {
+        return;
+      }
+      _lastAutomaticCheck = now;
+    }
     _checkingForUpdates = true;
     try {
       final release = await _updates.latestAvailable();
@@ -326,6 +353,7 @@ class _CalculatorHomeState extends State<CalculatorHome> with WidgetsBindingObse
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _search.dispose();
     if (widget.automaticUpdates) {
       WidgetsBinding.instance.removeObserver(this);
@@ -377,7 +405,7 @@ class _CalculatorHomeState extends State<CalculatorHome> with WidgetsBindingObse
             onPressed: () => showAboutDialog(
               context: context,
               applicationName: 'AURORA Calculadora Farmacêutica',
-              applicationVersion: '0.4.0',
+              applicationVersion: '0.5.0',
               children: [
                 const Text('Ferramenta educacional e de apoio técnico. Não validada para liberação de lotes, decisão clínica ou substituição de métodos e procedimentos aprovados.'),
                 const SizedBox(height: 10),
@@ -404,7 +432,7 @@ class _CalculatorHomeState extends State<CalculatorHome> with WidgetsBindingObse
                       controller: _search,
                       textInputAction: TextInputAction.search,
                       decoration: InputDecoration(
-                        hintText: 'Buscar fórmula ou cálculo',
+                        hintText: 'Pesquise entre as calculadoras',
                         prefixIcon: const Icon(Icons.search),
                         suffixIcon: query.isNotEmpty ? IconButton(
                           tooltip: 'Limpar pesquisa',
@@ -491,7 +519,7 @@ class _CalculatorHomeState extends State<CalculatorHome> with WidgetsBindingObse
         Text('Precisão em cada cálculo.',
             style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800)),
         SizedBox(height: 9),
-        Text('22 ferramentas, fórmulas explicadas e resultados instantâneos. Funciona offline.',
+        Text('22 calculadoras, leitura de prescrição por foto e resultados locais.',
             style: TextStyle(color: Color(0xFFE2E7FA), fontSize: 14, height: 1.5)),
         SizedBox(height: 14),
         Row(children: [
@@ -530,7 +558,7 @@ class _CalculatorHomeState extends State<CalculatorHome> with WidgetsBindingObse
                   favorite: starred,
                   onFavorite: () => _toggleFavorite(calc.id),
                 ),
-        )).then((_) { if (mounted) setState(() {}); }),
+        )),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [

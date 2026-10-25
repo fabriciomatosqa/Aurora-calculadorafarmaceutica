@@ -149,9 +149,7 @@ class UpdateService {
       throw const UpdateException(
         'Esta instalação é um APK de testes (DEBUG). '
         'APKs de teste não podem substituir a versão oficial assinada. '
-        'Antes de migrar para um Release, preserve os dados do aplicativo. '
-        'Depois da primeira instalação oficial, as próximas atualizações '
-        'serão realizadas diretamente no AURORA.',
+        'Preserve os dados antes de qualquer migração.',
       );
     }
     final current = await installedVersion();
@@ -162,53 +160,79 @@ class UpdateService {
       'X-GitHub-Api-Version': '2022-11-28',
       'User-Agent': 'AURORA-Calculadora-Farmaceutica',
     }).timeout(_timeout);
-
     if (response.statusCode == 404) {
       throw const UpdateException(
-        'Ainda não existe uma versão Android publicada nos Releases '
-        'do repositório oficial. Os cálculos continuam disponíveis offline.',
+        'Ainda não existe Release Android público para atualização.',
       );
     }
     if (response.statusCode != 200) {
-      throw UpdateException('Não foi possível consultar versões (HTTP ${response.statusCode}). '
-          'Confira a conexão e tente novamente.');
+      throw UpdateException('Falha ao consultar Releases (HTTP ${response.statusCode}).');
     }
     final parsed = jsonDecode(response.body);
     if (parsed is! Map<String, dynamic>) {
-      throw const UpdateException('Dados de versão inválidos.');
+      throw const UpdateException('Resposta de atualização inválida.');
     }
     final release = parseRelease(parsed);
     if (compareVersions(release.version, current) <= 0) return null;
     if (release.apkUrl == null || release.manifestUrl == null) {
-      throw const UpdateException(
-        'O Release não contém APK e manifesto Android compatíveis.',
-      );
+      throw const UpdateException('Release sem APK e manifesto Android.');
     }
+
     final manifestResponse = await _client.get(release.manifestUrl!, headers: {
       'User-Agent': 'AURORA-Calculadora-Farmaceutica',
     }).timeout(_timeout);
     if (manifestResponse.statusCode != 200 ||
         manifestResponse.bodyBytes.length > 128 * 1024) {
-      throw const UpdateException('Não foi possível verificar o manifesto da atualização.');
+      throw const UpdateException('Não foi possível baixar o manifesto da versão.');
     }
     final contents = jsonDecode(manifestResponse.body);
     if (contents is! Map<String, dynamic>) {
-      throw const UpdateException('Manifesto de atualização inválido.');
+      throw const UpdateException('Manifesto Android inválido.');
     }
     final code = contents['versionCode'];
     final size = contents['size'];
     final minSdk = contents['minSdk'];
     final cert = contents['signingCertSha256'];
     final checksum = contents['sha256'];
-    final packageName = contents['packageName'];
+    final appId = contents['packageName'];
     if (contents['schemaVersion'] != 1 ||
         contents['versionName'] != release.version ||
-        packageName != 'br.com.aurora.aurora_calculadora_farmaceutica' ||
+        appId != 'br.com.aurora.aurora_calculadora_farmaceutica' ||
         contents['apkUrl'] != release.apkUrl.toString() ||
         code is! int || code <= 0 ||
         size is! int || size <= 0 || size > _maxApkBytes ||
         minSdk is! int || minSdk < 21 ||
-        cert is! String || !RegExp(r'^[a-f0-9]{64}
+        cert is! String || !RegExp(r'^[a-f0-9]{64}$').hasMatch(cert) ||
+        checksum is! String || !RegExp(r'^[a-f0-9]{64}$').hasMatch(checksum) ||
+        (release.size != 0 && size != release.size) ||
+        (release.digest != null && release.digest != checksum)) {
+      throw const UpdateException(
+        'Manifesto incompatível com o APK do Release oficial.',
+      );
+    }
+    final currentCode = _installedVersionOverride == null
+        ? int.tryParse((await PackageInfo.fromPlatform()).buildNumber)
+        : null;
+    if (currentCode != null && code <= currentCode) return null;
+
+    final notes = contents['notes'];
+    return AppRelease(
+      version: release.version,
+      description: notes is String
+          ? (notes.length > 8000 ? notes.substring(0, 8000) : notes)
+          : release.description,
+      pageUrl: release.pageUrl,
+      apkUrl: release.apkUrl,
+      sha256Url: release.sha256Url,
+      manifestUrl: release.manifestUrl,
+      versionCode: code,
+      packageName: appId,
+      minSdk: minSdk,
+      signingCertSha256: cert,
+      sha256: checksum,
+      digest: release.digest,
+      size: size,
+    );
   }
 
   /// Download is verified against GitHub's asset SHA-256 or a .sha256 asset.
@@ -299,202 +323,6 @@ class UpdateService {
     } on PlatformException catch (e) {
       throw UpdateException(e.message ??
           'O APK tem versão ou assinatura incompatível com o app instalado.');
-    }
-    final result = await OpenFilex.open(
-      apk.path, type: 'application/vnd.android.package-archive',
-    );
-    if (result.type != ResultType.done) {
-      throw UpdateException(
-        'O instalador não foi aberto: ${result.message}. '
-        'Verifique a autorização para instalar apps desta origem.',
-      );
-    }
-  }
-}
-).hasMatch(cert) ||
-        checksum is! String || !RegExp(r'^[a-f0-9]{64}
-  }
-
-  /// Download is verified against GitHub's asset SHA-256 or a .sha256 asset.
-  /// Never invoke Android's package installer for an unverified download.
-  Future<File> downloadVerifiedApk(AppRelease release,
-      {void Function(int received, int total)? onProgress}) async {
-    if (!Platform.isAndroid) {
-      throw const UpdateException('Instalação por APK disponível apenas no Android.');
-    }
-    final url = release.apkUrl;
-    if (url == null) {
-      throw const UpdateException('A versão não contém APK compatível.');
-    }
-    String? expectedSha = release.digest;
-    if (expectedSha == null) {
-      final checksumUrl = release.sha256Url;
-      if (checksumUrl == null) {
-        throw const UpdateException('Release sem checksum SHA-256. Download bloqueado.');
-      }
-      final checksum = await _client.get(checksumUrl).timeout(_timeout);
-      if (checksum.statusCode != 200) {
-        throw const UpdateException('Não foi possível obter o checksum SHA-256.');
-      }
-      final value = checksum.body.trim().split(RegExp(r'\s+')).first.toLowerCase();
-      if (!RegExp(r'^[a-f0-9]{64}$').hasMatch(value)) {
-        throw const UpdateException('Checksum inválido.');
-      }
-      expectedSha = value;
-    }
-    if (release.size > _maxApkBytes) {
-      throw const UpdateException('APK ultrapassa o limite de segurança.');
-    }
-
-    final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/aurora-update-${release.version}.apk');
-    final request = http.Request('GET', url);
-    final response = await _client.send(request).timeout(_timeout);
-    if (response.statusCode != 200) {
-      throw UpdateException('Falha no download (HTTP ${response.statusCode}).');
-    }
-    final sink = file.openWrite();
-    var received = 0;
-    var sinkClosed = false;
-    try {
-      await for (final chunk in response.stream.timeout(_timeout)) {
-        received += chunk.length;
-        if (received > _maxApkBytes) {
-          throw const UpdateException('Download maior que o permitido.');
-        }
-        sink.add(chunk);
-        onProgress?.call(received, release.size);
-      }
-      await sink.flush();
-      await sink.close();
-      sinkClosed = true;
-      final checksum = await sha256.bind(file.openRead()).first;
-      if (checksum.toString().toLowerCase() != expectedSha) {
-        throw const UpdateException('Verificação SHA-256 falhou. APK descartado.');
-      }
-      return file;
-    } catch (_) {
-      if (!sinkClosed) await sink.close();
-      if (await file.exists()) await file.delete();
-      rethrow;
-    }
-  }
-
-  Future<void> requestInstallation(File apk) async {
-    if (!Platform.isAndroid) {
-      throw const UpdateException('O iOS não permite instalar um APK.');
-    }
-    final result = await OpenFilex.open(
-      apk.path, type: 'application/vnd.android.package-archive',
-    );
-    if (result.type != ResultType.done) {
-      throw UpdateException(
-        'O instalador não foi aberto: ${result.message}. '
-        'Verifique a autorização para instalar apps desta origem.',
-      );
-    }
-  }
-}
-).hasMatch(checksum) ||
-        (release.size != 0 && size != release.size) ||
-        (release.digest != null && release.digest != checksum)) {
-      throw const UpdateException(
-        'O Release não passou nas verificações de integridade.',
-      );
-    }
-    final currentCode = _installedVersionOverride == null
-        ? int.tryParse((await PackageInfo.fromPlatform()).buildNumber)
-        : null;
-    if (currentCode != null && code <= currentCode) return null;
-
-    final notes = contents['notes'];
-    return AppRelease(
-      version: release.version,
-      description: notes is String
-          ? (notes.length > 8000 ? notes.substring(0, 8000) : notes)
-          : release.description,
-      pageUrl: release.pageUrl,
-      apkUrl: release.apkUrl,
-      sha256Url: release.sha256Url,
-      manifestUrl: release.manifestUrl,
-      versionCode: code,
-      packageName: packageName,
-      minSdk: minSdk,
-      signingCertSha256: cert,
-      sha256: checksum,
-      digest: release.digest,
-      size: size,
-    );
-  }
-
-  /// Download is verified against GitHub's asset SHA-256 or a .sha256 asset.
-  /// Never invoke Android's package installer for an unverified download.
-  Future<File> downloadVerifiedApk(AppRelease release,
-      {void Function(int received, int total)? onProgress}) async {
-    if (!Platform.isAndroid) {
-      throw const UpdateException('Instalação por APK disponível apenas no Android.');
-    }
-    final url = release.apkUrl;
-    if (url == null) {
-      throw const UpdateException('A versão não contém APK compatível.');
-    }
-    String? expectedSha = release.digest;
-    if (expectedSha == null) {
-      final checksumUrl = release.sha256Url;
-      if (checksumUrl == null) {
-        throw const UpdateException('Release sem checksum SHA-256. Download bloqueado.');
-      }
-      final checksum = await _client.get(checksumUrl).timeout(_timeout);
-      if (checksum.statusCode != 200) {
-        throw const UpdateException('Não foi possível obter o checksum SHA-256.');
-      }
-      final value = checksum.body.trim().split(RegExp(r'\s+')).first.toLowerCase();
-      if (!RegExp(r'^[a-f0-9]{64}$').hasMatch(value)) {
-        throw const UpdateException('Checksum inválido.');
-      }
-      expectedSha = value;
-    }
-    if (release.size > _maxApkBytes) {
-      throw const UpdateException('APK ultrapassa o limite de segurança.');
-    }
-
-    final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/aurora-update-${release.version}.apk');
-    final request = http.Request('GET', url);
-    final response = await _client.send(request).timeout(_timeout);
-    if (response.statusCode != 200) {
-      throw UpdateException('Falha no download (HTTP ${response.statusCode}).');
-    }
-    final sink = file.openWrite();
-    var received = 0;
-    var sinkClosed = false;
-    try {
-      await for (final chunk in response.stream.timeout(_timeout)) {
-        received += chunk.length;
-        if (received > _maxApkBytes) {
-          throw const UpdateException('Download maior que o permitido.');
-        }
-        sink.add(chunk);
-        onProgress?.call(received, release.size);
-      }
-      await sink.flush();
-      await sink.close();
-      sinkClosed = true;
-      final checksum = await sha256.bind(file.openRead()).first;
-      if (checksum.toString().toLowerCase() != expectedSha) {
-        throw const UpdateException('Verificação SHA-256 falhou. APK descartado.');
-      }
-      return file;
-    } catch (_) {
-      if (!sinkClosed) await sink.close();
-      if (await file.exists()) await file.delete();
-      rethrow;
-    }
-  }
-
-  Future<void> requestInstallation(File apk) async {
-    if (!Platform.isAndroid) {
-      throw const UpdateException('O iOS não permite instalar um APK.');
     }
     final result = await OpenFilex.open(
       apk.path, type: 'application/vnd.android.package-archive',

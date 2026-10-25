@@ -38,7 +38,7 @@ class PrescriptionDocumentReader {
 
   Future<PrescriptionDocument?> fromFile() async {
     // Android Storage Access Framework, without blanket storage permissions.
-    final selection = await FilePicker.platform.pickFiles(
+    final selection = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
       allowMultiple: false,

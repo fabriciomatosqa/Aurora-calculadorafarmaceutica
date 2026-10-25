@@ -5,8 +5,8 @@ CalculatorDefinition d(String id) => calculators.firstWhere((c) => c.id == id);
 CalculationResult run(String id, Map<String, String> values) => calculate(d(id), values);
 
 void main() {
-  test('Catálogo possui 21 IDs distintos com fórmulas e aviso', () {
-    expect(calculators.length, 21);
+  test('Catálogo possui 22 IDs distintos com fórmulas e aviso', () {
+    expect(calculators.length, 22);
     expect(calculators.map((c) => c.id).toSet().length, 21);
     expect(calculators.every((c) => c.formula.isNotEmpty && c.note.isNotEmpty), true);
   });

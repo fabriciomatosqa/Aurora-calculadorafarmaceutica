@@ -9,6 +9,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('AURORA'), findsOneWidget);
     expect(find.text('Calculadoras'), findsOneWidget);
-    expect(find.text('Buscar fórmula ou cálculo'), findsOneWidget);
+    expect(find.text('Pesquise entre as calculadoras'), findsOneWidget);
   });
 }

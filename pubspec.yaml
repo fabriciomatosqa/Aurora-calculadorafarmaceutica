@@ -1,7 +1,7 @@
 name: aurora_calculadora_farmaceutica
 description: Calculadora farmacêutica para laboratório, controle de qualidade e produção.
 publish_to: none
-version: 0.6.2+8
+version: 0.6.3+9
 
 environment:
   sdk: '>=3.10.0 <4.0.0'

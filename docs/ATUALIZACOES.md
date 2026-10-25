@@ -1,4 +1,4 @@
-# Atualização online do AURORA — Android v0.6.2
+# Atualização online do AURORA — Android v0.6.3
 
 ## Configuração da assinatura em um comando no Windows
 
@@ -19,6 +19,21 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\configurar_assinat
 ```
 
 **Guarde um backup offline do arquivo e da senha em local seguro.** A senha e a chave não podem ser recuperadas a partir dos GitHub Secrets. Se a instalação atual possui outra assinatura e a chave antiga está indisponível, o Android não aceita atualização por cima dela: antes de desinstalar, exporte ou preserve os dados importantes. O primeiro Release oficial pode exigir uma migração única; os Releases seguintes, assinados com a chave estável, poderão ser instalados pelo AURORA.
+
+## Fluxo de atualização equivalente ao AURORA IPTV
+
+O aplicativo consulta o GitHub Release público do repositório oficial, lê o arquivo **`aurora-update.json`** e confere os campos de versão e identidade do Android antes de oferecer o download:
+
+- `schemaVersion`, `versionName`, `versionCode`, `packageName` e `minSdk`;
+- `apkUrl` restrita ao Release oficial, `size` e `sha256`;
+- `signingCertSha256`, impressão digital pública do certificado de assinatura;
+- notas da versão (`notes`).
+
+O app baixa e verifica o APK no celular. Antes de abrir o instalador, uma verificação **nativa do Android** compara o ID do pacote, `versionCode`, compatibilidade de Android e certificados de assinatura do APK novo e do app instalado. O Android faz a validação definitiva durante a instalação, sempre exigindo consentimento.
+
+A publicação pela CI foi alterada para **validar APK real → criar manifesto SHA-256 → criar Release em rascunho → enviar todos os arquivos → publicar**. O primeiro Release estabelece o certificado; as publicações seguintes com um certificado diferente são bloqueadas. Uma versão já publicada nunca tem seu APK substituído.
+
+**Diferentemente do IPTV atual, a chave privada não é guardada em cache de GitHub Actions e nenhuma senha fica no código público.** A chave persistente permanece fora do repositório; apenas os Secrets criptografados do Actions viabilizam a assinatura. Sem esses Secrets, nenhum APK de atualização oficial pode ser publicado.
 
 ## O erro "o pacote tem um conflito com um pacote já existente"
 

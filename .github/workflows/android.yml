@@ -3,6 +3,8 @@ name: Android - testes, APK e Release
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -107,11 +109,11 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.AURORA_PUBLIC_RELEASE_TOKEN }}
-          DISTRIBUTION_REPO: ${{ vars.AURORA_PUBLIC_RELEASE_REPO }}
+          DISTRIBUTION_REPO: fabriciomatosqa/aurora-calculadora-farmaceutica-updates
         run: |
           set -euo pipefail
-          if [[ -z "$GH_TOKEN" || -z "$DISTRIBUTION_REPO" ]]; then
-            echo "::warning::Atualização pública pendente: configure o repositório público e AURORA_PUBLIC_RELEASE_TOKEN."
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo "::warning::Atualização pública pendente: configure AURORA_PUBLIC_RELEASE_TOKEN."
             echo "APK assinado nos Artifacts, mas ainda NÃO acessível pelo atualizador online." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi

@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:pdfrx/pdfrx.dart';
+import 'package:path_provider/path_provider.dart';
 
 /// Processes documents strictly on the device. It makes no network calls and
 /// never infers a drug's maximum dose or whether a prescription is valid.
@@ -38,26 +39,58 @@ class PrescriptionDocumentReader {
 
   Future<PrescriptionDocument?> fromFile() async {
     // Android Storage Access Framework, without blanket storage permissions.
-    final selection = await FilePicker.pickFiles(
+    // file_picker 12: pickFile() returns one PlatformFile, not FilePickerResult.
+    final document = await FilePicker.pickFile(
       type: FileType.custom,
       allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
-      allowMultiple: false,
-      withData: false,
     );
-    if (selection == null || selection.files.isEmpty) return null;
-    final document = selection.files.single;
-    final path = document.path;
-    if (path == null) {
+    if (document == null) return null;
+
+    final extension = document.name.split('.').last.toLowerCase();
+    if (!['pdf', 'jpg', 'jpeg', 'png'].contains(extension)) {
+      throw const PrescriptionReadException('Formato não suportado.');
+    }
+
+    final size = document.lengthSync() ?? await document.length();
+    if (size <= 0 || size > maxSizeBytes) {
       throw const PrescriptionReadException(
-        'O arquivo selecionado não está disponível neste aparelho.',
+        'O arquivo precisa ter até 15 MB e não pode estar vazio.',
       );
     }
-    final extension = document.name.split('.').last.toLowerCase();
-    if (extension == 'pdf') return _readPdf(path, document.name);
-    if (['jpg', 'jpeg', 'png'].contains(extension)) {
-      return _recognizeImage(path, document.name);
+
+    // Android SAF may return a content:// URI instead of a disk path. Copy
+    // streamed bytes to our private cache with an explicit size limit.
+    final directory = await getTemporaryDirectory();
+    final temporary = File(
+      '${directory.path}/aurora_prescricao_${DateTime.now().microsecondsSinceEpoch}.$extension',
+    );
+    var written = 0;
+    final sink = temporary.openWrite();
+    var closed = false;
+    try {
+      await for (final chunk in document.readAsByteStream()) {
+        written += chunk.length;
+        if (written > maxSizeBytes) {
+          throw const PrescriptionReadException(
+            'O arquivo excedeu o limite de 15 MB.',
+          );
+        }
+        sink.add(chunk);
+      }
+      await sink.flush();
+      await sink.close();
+      closed = true;
+      if (written == 0) {
+        throw const PrescriptionReadException('Arquivo vazio.');
+      }
+      if (extension == 'pdf') {
+        return await _readPdf(temporary.path, document.name);
+      }
+      return await _recognizeImage(temporary.path, document.name);
+    } finally {
+      if (!closed) await sink.close();
+      if (await temporary.exists()) await temporary.delete();
     }
-    throw const PrescriptionReadException('Formato não suportado.');
   }
 
   Future<PrescriptionDocument> _recognizeImage(

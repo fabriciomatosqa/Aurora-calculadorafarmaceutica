@@ -9,36 +9,81 @@ void main() {
     expect(updateRepository, 'fabriciomatosqa/Aurora-calculadorafarmaceutica');
   });
 
-  test('Consulta uma Release pública maior que a versão instalada', () async {
+  test('Lê manifesto assinado do Release mais recente e compara versões', () async {
+    final apkName = 'aurora-calculadora-farmaceutica-v0.5.0-android.apk';
+    final assetUrl = 'https://github.com/fabriciomatosqa/'
+        'Aurora-calculadorafarmaceutica/releases/download/v0.5.0/$apkName';
+    final manifestUrl = 'https://github.com/fabriciomatosqa/'
+        'Aurora-calculadorafarmaceutica/releases/download/v0.5.0/'
+        'aurora-update.json';
+    final sha = List.filled(64, 'a').join();
+    final signer = List.filled(64, 'b').join();
     final client = MockClient((request) async {
-      expect(
-        request.url.toString(),
-        'https://api.github.com/repos/'
-        'fabriciomatosqa/Aurora-calculadorafarmaceutica/releases/latest',
-      );
+      if (request.url.toString() == manifestUrl) {
+        return http.Response(jsonEncode({
+          'schemaVersion': 1,
+          'packageName': 'br.com.aurora.aurora_calculadora_farmaceutica',
+          'versionName': '0.5.0',
+          'versionCode': 5,
+          'minSdk': 24,
+          'apkUrl': assetUrl,
+          'size': 14000000,
+          'sha256': sha,
+          'signingCertSha256': signer,
+          'notes': 'Correções Android',
+        }), 200);
+      }
+      expect(request.url.toString(),
+          'https://api.github.com/repos/'
+          'fabriciomatosqa/Aurora-calculadorafarmaceutica/releases/latest');
       return http.Response(jsonEncode({
         'tag_name': 'v0.5.0',
-        'html_url': 'https://github.com/fabriciomatosqa/Aurora-calculadorafarmaceutica/releases/tag/v0.5.0',
+        'html_url': 'https://github.com/fabriciomatosqa/'
+            'Aurora-calculadorafarmaceutica/releases/tag/v0.5.0',
         'body': 'Correções Android',
         'assets': [
           {
-            'name': 'aurora-calculadora-farmaceutica-v0.5.0-android.apk',
-            'browser_download_url': 'https://github.com/fabriciomatosqa/Aurora-calculadorafarmaceutica/releases/download/v0.5.0/aurora-calculadora-farmaceutica-v0.5.0-android.apk',
-            'digest': 'sha256:${List.filled(64, 'a').join()}',
+            'name': apkName,
+            'browser_download_url': assetUrl,
+            'digest': 'sha256:$sha',
             'size': 14000000,
+          },
+          {
+            'name': 'aurora-update.json',
+            'browser_download_url': manifestUrl,
           },
         ],
       }), 200);
     });
     final service = UpdateService(
-      client: client,
-      installedVersionOverride: '0.4.0',
+      client: client, installedVersionOverride: '0.4.0',
     );
     addTearDown(service.dispose);
     final release = await service.latestAvailable();
     expect(release?.version, '0.5.0');
-    expect(release?.apkUrl, isNotNull);
-    expect(release?.digest, List.filled(64, 'a').join());
+    expect(release?.versionCode, 5);
+    expect(release?.packageName,
+        'br.com.aurora.aurora_calculadora_farmaceutica');
+    expect(release?.sha256, sha);
+    expect(release?.signingCertSha256, signer);
+    expect(release?.apkUrl.toString(), assetUrl);
+  });
+
+  test('Release maior sem manifesto não pode ser instalado', () async {
+    final client = MockClient((_) async => http.Response(jsonEncode({
+      'tag_name': 'v0.6.0',
+      'html_url': 'https://github.com/fabriciomatosqa/'
+          'Aurora-calculadorafarmaceutica/releases/tag/v0.6.0',
+      'assets': [{
+        'name': 'aurora-calculadora-farmaceutica-v0.6.0-android.apk',
+        'browser_download_url': 'https://github.com/fabriciomatosqa/'
+            'Aurora-calculadorafarmaceutica/releases/download/v0.6.0/'
+            'aurora-calculadora-farmaceutica-v0.6.0-android.apk',
+      }],
+    }), 200));
+    final service = UpdateService(client: client, installedVersionOverride: '0.5.0');
+    addTearDown(service.dispose);
+    expect(() => service.latestAvailable(), throwsA(isA<UpdateException>()));
   });
 
   test('Não oferece versão mais antiga ou igual', () async {

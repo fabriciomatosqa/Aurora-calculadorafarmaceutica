@@ -7,28 +7,17 @@ import 'package:http/http.dart' as http;
 import 'package:open_filex/open_filex.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-/// Public GitHub distribution repository. Source stays PRIVATE.
-/// No GitHub access token is ever stored in the APK.
-const defaultUpdateRepository =
+/// Canal oficial de distribuição embutido no aplicativo.
+/// O código-fonte permanece privado; somente APKs assinados são públicos.
+/// Nenhuma configuração, login ou token é solicitado a quem usa o AURORA.
+const officialUpdateRepository =
     'fabriciomatosqa/aurora-calculadora-farmaceutica-updates';
-const _updateRepoKey = 'aurora_public_update_repository_v1';
 
-String validateUpdateRepository(String input) {
-  final repo = input.trim();
-  if (!RegExp(r'^fabriciomatosqa/[A-Za-z0-9._-]{1,100}$',
-      caseSensitive: false).hasMatch(repo)) {
-    throw const UpdateException(
-      'Informe um repositório público da conta fabriciomatosqa '
-      '(formato: fabriciomatosqa/nome-do-repositorio).',
+Uri officialReleaseEndpoint() => Uri.https(
+      'api.github.com',
+      '/repos/$officialUpdateRepository/releases/latest',
     );
-  }
-  if (repo.split('/')[1].startsWith('.')) {
-    throw const UpdateException('Nome de repositório inválido.');
-  }
-  return repo;
-}
 
 class AppRelease {
   const AppRelease({
@@ -131,32 +120,12 @@ class UpdateService {
 
   void dispose() => _client.close();
 
-  Future<String> configuredRepository() async {
-    final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getString(_updateRepoKey);
-    return validateUpdateRepository(
-      saved == null || saved.trim().isEmpty
-          ? defaultUpdateRepository
-          : saved,
-    );
-  }
-
-  Future<void> configureRepository(String value) async {
-    final checked = validateUpdateRepository(value);
-    final prefs = await SharedPreferences.getInstance();
-    if (!await prefs.setString(_updateRepoKey, checked)) {
-      throw const UpdateException('Não foi possível salvar o canal.');
-    }
-  }
-
   Future<String> installedVersion() async =>
       (await PackageInfo.fromPlatform()).version;
 
   Future<AppRelease?> latestAvailable() async {
     final current = await installedVersion();
-    final repository = await configuredRepository();
-    final uri = Uri.https('api.github.com',
-        '/repos/$repository/releases/latest');
+    final uri = officialReleaseEndpoint();
     final response = await _client.get(uri, headers: {
       'Accept': 'application/vnd.github+json',
       'X-GitHub-Api-Version': '2022-11-28',
@@ -165,9 +134,8 @@ class UpdateService {
 
     if (response.statusCode == 404) {
       throw const UpdateException(
-        'Este canal não possui um Release público acessível. '
-        'Confira em Configurar atualizações se o repositório está público '
-        'e contém uma versão Android publicada.',
+        'O canal oficial de atualizações ainda não disponibiliza um '
+        'Release público. Tente novamente mais tarde.',
       );
     }
     if (response.statusCode != 200) {

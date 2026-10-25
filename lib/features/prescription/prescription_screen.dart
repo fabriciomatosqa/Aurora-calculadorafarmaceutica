@@ -4,6 +4,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../domain/calculator.dart';
 import '../../domain/prescription.dart';
+import 'prescription_capture.dart';
+import 'prescription_ocr_parser.dart';
 
 /// Fixed-schedule prescription quantity aid for pharmacists.
 /// Not a clinical prescribing or drug-database application.
@@ -26,6 +28,9 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
   final _package = TextEditingController();
   PrescriptionCalculation? _result;
   String? _error;
+  String? _ocrReviewNote;
+  bool _reviewedOcr = false;
+  final _formKey = GlobalKey();
 
   @override
   void dispose() {
@@ -51,8 +56,47 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
     return value;
   }
 
+  void _applyRecognized(OcrPrescriptionCandidate item) {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      // Clear every prior field to avoid accidental cross-medication reuse.
+      _name.text = item.name;
+      _form = item.form ?? PharmaceuticalForm.tablet;
+      _strength.text = item.strengthMgPerUnit?.toString() ?? '';
+      _dose.text = item.doseMgPerAdministration?.toString() ?? '';
+      _times.text = item.administrationsPerDay?.toString() ?? '';
+      _days.text = item.durationDays?.toString() ?? '';
+      _maximum.clear();
+      _reference.clear();
+      _package.clear();
+      _reviewedOcr = false;
+      _ocrReviewNote = item.warnings.isEmpty
+          ? 'Dados importados do OCR. Confirme todos os valores com a imagem original.'
+          : 'A leitura contém campos ausentes ou situações não suportadas: '
+              + item.warnings.join(' ');
+      _result = null;
+      _error = null;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final target = _formKey.currentContext;
+      if (target != null) {
+        Scrollable.ensureVisible(target,
+          duration: const Duration(milliseconds: 230),
+          curve: Curves.easeOutCubic, alignment: 0.04);
+      }
+    });
+  }
+
   void _calculate() {
     FocusScope.of(context).unfocus();
+    if (_ocrReviewNote != null && !_reviewedOcr) {
+      setState(() {
+        _error = 'Confira a prescrição original e confirme os dados '
+            'extraídos antes de calcular.';
+        _result = null;
+      });
+      return;
+    }
     try {
       final result = calculatePrescription(
         form: _form,
@@ -106,6 +150,8 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
     _reference.text = 'LIMITE FICTÍCIO PARA DEMONSTRAÇÃO — não usar clinicamente';
     _package.text = '10';
     setState(() {
+      _ocrReviewNote = null;
+      _reviewedOcr = false;
       _result = null;
       _error = null;
     });
@@ -129,6 +175,7 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
           setState(() {
             _result = null;
             _error = null;
+            if (_ocrReviewNote != null) _reviewedOcr = false;
           });
         }
       },
@@ -283,7 +330,32 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
                 'ajuste por peso ou função renal, uso pediátrico, '
                 'fracionamento de comprimidos e outras situações especiais.',
               ),
+              const SizedBox(height: 17),
+              PrescriptionCapture(onReviewCandidate: _applyRecognized),
               const SizedBox(height: 18),
+              Card(
+                key: _formKey,
+                margin: EdgeInsets.zero,
+                child: Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(children: [
+                        Icon(Icons.fact_check_outlined, color: scheme.primary),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text('Conferência dos dados',
+                          style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w800))),
+                      ]),
+                      const SizedBox(height: 7),
+                      Text('Preencha manualmente ou revise o que a câmera identificou.',
+                        style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+                      if (_ocrReviewNote != null) ...[
+                        const SizedBox(height: 12),
+                        _warning(_ocrReviewNote!, critical: true),
+                      ],
+                      const SizedBox(height: 16),
               TextField(
                 controller: _name,
                 decoration: const InputDecoration(
@@ -309,6 +381,7 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
                   if (form == null) return;
                   setState(() {
                     _form = form;
+                    if (_ocrReviewNote != null) _reviewedOcr = false;
                     _package.clear();
                     _result = null;
                     _error = null;
@@ -353,6 +426,7 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
                     setState(() {
                       _result = null;
                       _error = null;
+                      if (_ocrReviewNote != null) _reviewedOcr = false;
                     });
                   }
                 },
@@ -377,15 +451,37 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
                 'Embalagens completas são estimadas por arredondamento '
                 'para cima, sem modificar a dose.',
               ),
+              if (_ocrReviewNote != null) ...[
+                const SizedBox(height: 14),
+                CheckboxListTile(
+                  value: _reviewedOcr,
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  title: const Text('Conferi a prescrição original e todos os dados usados'),
+                  subtitle: const Text('A confirmação não equivale à validação clínica.'),
+                  onChanged: (value) => setState(() {
+                    _reviewedOcr = value ?? false;
+                    _result = null;
+                    _error = null;
+                  }),
+                ),
+              ],
+                    ],
+                  ),
+                ),
+              ),
               const SizedBox(height: 18),
               if (_error != null) ...[
                 _warning(_error!, critical: true),
                 const SizedBox(height: 14),
               ],
-              FilledButton.icon(
-                onPressed: _calculate,
-                icon: const Icon(Icons.calculate_outlined),
-                label: const Text('Calcular unidades necessárias'),
+              SizedBox(
+                height: 52,
+                child: FilledButton.icon(
+                  onPressed: _calculate,
+                  icon: const Icon(Icons.calculate_outlined),
+                  label: const Text('Calcular unidades necessárias'),
+                ),
               ),
               const SizedBox(height: 6),
               TextButton(

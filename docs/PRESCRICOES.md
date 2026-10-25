@@ -2,6 +2,24 @@
 
 > Protótipo educacional e de apoio técnico, NÃO homologado/validado para dispensação, tomada de decisão clínica, prescrição ou atendimento de requisitos GxP.
 
+## Importar uma prescrição (Android v0.6.0)
+
+No menu inicial, toque em **Prescrições → Quantidade da prescrição**.
+Logo no topo da tela aparecerá o cartão **1. IMPORTAR PRESCRIÇÃO**, com botões **Tirar foto**, **Galeria** e **Arquivo / PDF**.
+
+- **Tirar foto**: câmera do Android e OCR local na imagem.
+- **Galeria**: escolher JPG/PNG (ou imagem reconhecida pelo sistema) e executar OCR local.
+- **Arquivo / PDF**: seletor seguro do Android para **PDF, JPG e PNG**. PDFs que possuem texto selecionável são processados localmente. PDFs escaneados sem texto não são convertidos automaticamente em imagem: usar foto/galeria para OCR.
+- Limite de 15 MB por documento e 8 páginas para PDF.
+- O texto extraído aparece em um **campo editável** para comparar com a receita original.
+- O botão **Conferir e sugerir preenchimento** identifica somente certos padrões explícitos (forma, teor único e posologia regular). Antes de copiar qualquer sugestão para a calculadora, uma caixa de confirmação mostra os valores.
+- Conferir e corrigir manualmente os campos. **Dose máxima diária e fonte** permanecem obrigatoriamente sob responsabilidade do profissional. O app não as pesquisa nem as preenche.
+- Somente então usar **Calcular unidades necessárias**.
+
+A leitura é feita no aparelho, sem upload remoto ou servidor de IA. Documentos e texto não são armazenados permanentemente pelo AURORA como prontuário. O Android e o seletor de arquivos podem manter cópias temporárias sob políticas próprias. Evite dados identificáveis do paciente.
+
+**Atenção:** textos manuscritos, qualidade ruim ou unidades ambíguas podem produzir interpretações erradas. Não use OCR para aceitar/dispensar automaticamente prescrições; os dados originais e a bula aplicável devem ser verificados pelo profissional. O app não oferece diagnóstico nem decisão clínica.
+
 ## Objetivo
 
 Com base em uma prescrição legível e previamente avaliada pelo profissional, calcular **quantidade matemática** de unidades farmacêuticas para completar um tratamento **regular de dose fixa**, comparar o total diário prescrito com um **limite numérico previamente verificado e digitado pelo usuário**, e estimar embalagens comerciais quando informadas.

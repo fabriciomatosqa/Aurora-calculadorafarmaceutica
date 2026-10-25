@@ -17,6 +17,17 @@ for p in (permission, install_permission):
         xml = xml.replace("<application", "    " + p + "\n    <application", 1)
 manifest.write_text(xml, encoding="utf-8")
 
+# Android native PackageManager checks the archive's package/version/signature
+# before opening the system installer, just like AURORA IPTV.
+activity_template = root / "release/AndroidUpdateMainActivity.kt"
+if not activity_template.is_file():
+    sys.exit("Android update verifier template not found")
+activity = root / "android/app/src/main/kotlin/br/com/aurora/aurora_calculadora_farmaceutica/MainActivity.kt"
+activity.parent.mkdir(parents=True, exist_ok=True)
+activity.write_text(activity_template.read_text(encoding="utf-8"), encoding="utf-8")
+print("Native Android APK verification enabled.")
+
+
 # Distinguish CI debug/test installs from the final production app.
 # Never distribute a debug APK as an update to a published release.
 gradle = root / "android/app/build.gradle.kts"

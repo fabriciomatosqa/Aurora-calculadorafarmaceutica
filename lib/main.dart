@@ -112,75 +112,51 @@ class _CalculatorHomeState extends State<CalculatorHome> with WidgetsBindingObse
     }
   }
 
-  Future<void> _configureUpdates() async {
-    String repository;
+  static const _lastUpdateVersionKey = 'aurora_last_install_attempt_version';
+  static const _lastUpdateMillisKey = 'aurora_last_install_attempt_ms';
+  DateTime? _lastAutomaticCheck;
+
+  // Não consultar repetidamente a API quando o Android retoma o aplicativo,
+  // especialmente ao voltar do instalador de pacotes.
+  Future<bool> _shouldSkipRepeatedInstall(String version) async {
+    final prefs = await SharedPreferences.getInstance();
+    final sameVersion = prefs.getString(_lastUpdateVersionKey) == version;
+    final timestamp = prefs.getInt(_lastUpdateMillisKey);
+    if (!sameVersion || timestamp == null) return false;
+    final elapsed = DateTime.now().millisecondsSinceEpoch - timestamp;
+    return elapsed >= 0 && elapsed < const Duration(hours: 24).inMilliseconds;
+  }
+
+  Future<void> _recordInstallAttempt(String version) async {
+    // O controle evita downloads repetidos caso o usuário cancele a instalação.
+    // Falha ao salvar preferências não deve impedir uma atualização válida.
     try {
-      repository = await _updates.configuredRepository();
-    } on UpdateException catch (error) {
-      if (mounted) _message(error.message);
-      return;
-    }
-    if (!mounted) return;
-    final field = TextEditingController(text: repository);
-    try {
-      final selected = await showDialog<String>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('Configurar atualizações'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Informe o repositório PÚBLICO que disponibiliza os '
-                'APKs assinados do AURORA. O repositório privado de '
-                'código-fonte não pode ser usado diretamente.',
-              ),
-              const SizedBox(height: 15),
-              TextField(
-                controller: field,
-                autocorrect: false,
-                decoration: const InputDecoration(
-                  labelText: 'Repositório público',
-                  hintText: 'fabriciomatosqa/aurora-calculadora-farmaceutica-updates',
-                ),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Nenhuma senha ou token do GitHub deve ser informado aqui. '
-                'Somente repositórios da conta fabriciomatosqa são aceitos.',
-                style: TextStyle(fontSize: 12),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, field.text),
-              child: const Text('Salvar canal'),
-            ),
-          ],
-        ),
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_lastUpdateVersionKey, version);
+      await prefs.setInt(
+        _lastUpdateMillisKey,
+        DateTime.now().millisecondsSinceEpoch,
       );
-      if (selected == null || !mounted) return;
-      await _updates.configureRepository(selected);
-      if (!mounted) return;
-      _message('Canal salvo. Verificando versões disponíveis...');
-      await _checkForUpdates(automatic: false);
-    } on UpdateException catch (error) {
-      if (mounted) _message(error.message, settingsAction: true);
     } catch (_) {
-      if (mounted) _message('Não foi possível salvar a configuração.');
-    } finally {
-      field.dispose();
+      // A instalação continua mesmo sem o registro de tentativa.
     }
   }
 
   Future<void> _checkForUpdates({required bool automatic}) async {
     if (_checkingForUpdates) return;
+    if (!Platform.isAndroid) {
+      if (!automatic) _message('Atualizações por APK estão disponíveis no Android.');
+      return;
+    }
+    if (automatic) {
+      final now = DateTime.now();
+      final previous = _lastAutomaticCheck;
+      if (previous != null &&
+          now.difference(previous) < const Duration(minutes: 30)) {
+        return;
+      }
+      _lastAutomaticCheck = now;
+    }
     _checkingForUpdates = true;
     try {
       final release = await _updates.latestAvailable();
@@ -189,38 +165,14 @@ class _CalculatorHomeState extends State<CalculatorHome> with WidgetsBindingObse
         if (!automatic) _message('Você já está na versão mais recente.');
         return;
       }
-      final shouldUpdate = await showDialog<bool>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('Nova versão disponível'),
-          content: Column(mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('AURORA ${release.version} já está disponível.'),
-            const SizedBox(height: 8),
-            const Text('Deseja atualizar agora?'),
-            if (release.description.trim().isNotEmpty) ...[
-              const SizedBox(height: 12),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 160),
-                child: SingleChildScrollView(child: Text(release.description,
-                  style: const TextStyle(fontSize: 12))),
-              ),
-            ],
-          ]),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Agora não')),
-            FilledButton(onPressed: () => Navigator.pop(dialogContext, true),
-              child: Text(Platform.isAndroid ? 'Baixar e instalar' : 'Ver novidades')),
-          ],
-        ),
-      );
-      if (!mounted || shouldUpdate != true) return;
+      if (automatic && await _shouldSkipRepeatedInstall(release.version)) {
+        return;
+      }
+      // O APK é baixado automaticamente, sem solicitar canal ou confirmação
+      // extra no AURORA. A confirmação final pertence ao Android.
       await _downloadAndInstall(release);
     } on UpdateException catch (error) {
-      if (!automatic && mounted) {
-        _message(error.message, settingsAction: true);
-      }
+      if (!automatic && mounted) _message(error.message);
     } catch (_) {
       if (!automatic && mounted) {
         _message('Não foi possível verificar atualizações. Confira a internet.');
@@ -232,80 +184,71 @@ class _CalculatorHomeState extends State<CalculatorHome> with WidgetsBindingObse
 
   Future<void> _downloadAndInstall(AppRelease release) async {
     final progress = ValueNotifier<double?>(null);
-    // Modal permanece visível até concluir a verificação SHA-256.
-    bool dialogClosed = false;
-    final dialogFuture = showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => PopScope(
-        canPop: false,
-        child: AlertDialog(
-          title: const Text('Baixando atualização'),
-          content: ValueListenableBuilder<double?>(
-            valueListenable: progress,
-            builder: (_, value, __) => Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                LinearProgressIndicator(value: value),
-                const SizedBox(height: 14),
-                Text(value == null ? 'Download e verificação de segurança…'
-                    : '${(value * 100).toStringAsFixed(0)}% concluído'),
-              ],
-            ),
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    final notification = messenger.showSnackBar(
+      SnackBar(
+        duration: const Duration(hours: 1),
+        content: ValueListenableBuilder<double?>(
+          valueListenable: progress,
+          builder: (_, value, __) => Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Atualizando AURORA para a versão ${release.version}'),
+              const SizedBox(height: 10),
+              LinearProgressIndicator(value: value),
+              const SizedBox(height: 6),
+              Text(
+                value == null
+                    ? 'Download e conferência de segurança...'
+                    : '${(value * 100).toStringAsFixed(0)}% baixado',
+              ),
+            ],
           ),
         ),
       ),
     );
-    // Permite que o diálogo seja desenhado antes de iniciar a transferência.
-    await Future<void>.delayed(const Duration(milliseconds: 80));
+    var notificationRemoved = false;
+    void removeProgress() {
+      if (!notificationRemoved && mounted) {
+        messenger.removeCurrentSnackBar();
+        notificationRemoved = true;
+      }
+    }
+
     try {
-      final apk = await _updates.downloadVerifiedApk(release,
+      final apk = await _updates.downloadVerifiedApk(
+        release,
         onProgress: (received, total) {
-          if (total > 0 && received <= total) {
-            progress.value = received / total;
+          if (total > 0) {
+            progress.value = (received / total).clamp(0.0, 1.0).toDouble();
           }
         },
       );
       if (!mounted) return;
-      Navigator.of(context, rootNavigator: true).pop();
-      dialogClosed = true;
+      await _recordInstallAttempt(release.version);
+      removeProgress();
+      // O instalador nativo pode exigir autorização da origem e confirmação.
       await _updates.requestInstallation(apk);
     } on UpdateException catch (error) {
-      if (mounted) {
-        if (!dialogClosed) {
-          Navigator.of(context, rootNavigator: true).pop();
-          dialogClosed = true;
-        }
-        _message(error.message);
-      }
+      removeProgress();
+      if (mounted) _message(error.message);
     } catch (_) {
-      if (mounted) {
-        if (!dialogClosed) {
-          Navigator.of(context, rootNavigator: true).pop();
-          dialogClosed = true;
-        }
-        _message('Falha ao baixar ou abrir o APK. Tente novamente.');
-      }
+      removeProgress();
+      if (mounted) _message('Falha ao baixar ou abrir a atualização. Tente novamente.');
     } finally {
-      // Release resources only after the dialog's transition has completed.
-      if (mounted && !dialogClosed) Navigator.of(context, rootNavigator: true).pop();
-      await dialogFuture;
-      progress.dispose();
+      removeProgress();
+      unawaited(notification.closed.then((_) => progress.dispose()));
     }
   }
 
-  void _message(String value, {bool settingsAction = false}) {
+  void _message(String value) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(value),
-        duration: Duration(seconds: settingsAction ? 9 : 4),
-        action: settingsAction
-            ? SnackBarAction(
-                label: 'Configurar',
-                onPressed: () => unawaited(_configureUpdates()),
-              )
-            : null,
+        duration: const Duration(seconds: 5),
       ),
     );
   }
@@ -362,11 +305,6 @@ class _CalculatorHomeState extends State<CalculatorHome> with WidgetsBindingObse
         ]),
         actions: [
           IconButton(
-            tooltip: 'Configurar atualizações',
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: _configureUpdates,
-          ),
-          IconButton(
             tooltip: 'Verificar atualizações',
             icon: const Icon(Icons.system_update_alt_rounded),
             onPressed: () => _checkForUpdates(automatic: false),
@@ -377,7 +315,7 @@ class _CalculatorHomeState extends State<CalculatorHome> with WidgetsBindingObse
             onPressed: () => showAboutDialog(
               context: context,
               applicationName: 'AURORA Calculadora Farmacêutica',
-              applicationVersion: '0.4.0',
+              applicationVersion: '0.4.1',
               children: [
                 const Text('Ferramenta educacional e de apoio técnico. Não validada para liberação de lotes, decisão clínica ou substituição de métodos e procedimentos aprovados.'),
                 const SizedBox(height: 10),

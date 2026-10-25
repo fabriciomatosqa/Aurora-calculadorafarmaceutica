@@ -35,9 +35,9 @@ flutter build apk --debug
 
 Saída típica: `build/app/outputs/flutter-apk/app-debug.apk`.
 
-## Atualização diretamente pelo Android (v0.4.0)
+## Atualização automática pelo Android (v0.4.1)
 
-O aplicativo verifica atualizações públicas ao abrir e ao voltar ao primeiro plano; também oferece os ícones **Verificar atualizações** e **Configurar atualizações**. Quando identifica uma versão mais recente, mostra notas, pergunta se deseja atualizar, baixa o APK com indicador de progresso, valida SHA-256 e abre o instalador Android com confirmação do usuário. Os cálculos continuam disponíveis offline, sem exigir login no GitHub.
+O aplicativo verifica automaticamente atualizações ao abrir e voltar ao primeiro plano (consulta com intervalo mínimo na mesma sessão). Não existe campo para inserir repositório, caminho ou token. Quando encontra versão nova, baixa o APK oficial com indicador de progresso não bloqueante, valida SHA-256 e abre o instalador Android; a confirmação do usuário poderá ser exigida pelo sistema. O botão **Verificar atualizações** permanece para checagem manual, e os cálculos continuam disponíveis offline.
 
 **Distribuição ainda depende da configuração inicial pelo proprietário:** o código está em repositório privado e não pode ser consultado anonimamente. O AURORA consulta por padrão o canal PÚBLICO `fabriciomatosqa/aurora-calculadora-farmaceutica-updates`, que precisa ser criado. A CI publica lá apenas APKs assinados e arquivos SHA-256, após a configuração de uma chave persistente e de permissões de publicação restritas.
 

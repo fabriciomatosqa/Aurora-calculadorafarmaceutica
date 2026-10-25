@@ -1,75 +1,85 @@
-# Atualização pelo próprio AURORA — Android v0.4.0
+# Atualização automática do AURORA — Android v0.4.1
 
-## Estado e limites
+## Experiência de quem usa o aplicativo
 
-A versão 0.4.0 consulta um canal PÚBLICO de GitHub Releases quando o aplicativo abre e quando volta ao primeiro plano, além de permitir checagem manual pelo ícone de atualização. Ao detectar versão superior, pergunta se deseja baixar e instalar. O download do APK é conferido por SHA-256 e encaminhado ao instalador Android para confirmação **pelo usuário**. Nunca é silencioso.
+Não há campo de repositório, token, URL ou canal. O AURORA conhece previamente
+seu endereço oficial de distribuição e **verifica atualizações automaticamente**
+na abertura e quando retorna ao primeiro plano (intervalo mínimo de 30 minutos
+dentro da mesma sessão). Sem versão nova, segue funcionando offline normalmente.
 
-**O código-fonte do AURORA permanece privado.** GitHub Releases em repositório privado não podem ser consultados de forma anônima por um APK. Não coloque tokens de GitHub no aplicativo.
+Quando encontra versão mais recente:
+1. Baixa o APK automaticamente, com progresso discreto, sem bloquear a interface.
+2. Confere a integridade do arquivo por SHA-256 fornecido pelo GitHub.
+3. Abre o instalador nativo do Android para finalizar a atualização.
+4. Registra a tentativa; se o usuário cancelar a instalação, evita repetir o
+   download automático da mesma versão por 24 horas. O botão **Verificar
+   atualizações** permite uma nova tentativa manual a qualquer momento.
 
-Em 24/10/2026, o repositório público de distribuição abaixo AINDA NÃO EXISTIA. A funcionalidade somente poderá concluir a consulta e baixar um APK depois da configuração descrita a seguir. Nunca confundir código publicado na `main`, Artifacts de CI e um Release PÚBLICO instalável.
+O Android **pode exigir autorização para instalar aplicativos desta origem e
+confirmação final**. Não há bypass nem promessa de instalação silenciosa. Esta
+distribuição é por APK externo à Play Store. Para aplicativos publicados pela
+Play Store, seguir os mecanismos próprios da loja.
 
-## 1. Criar o canal de distribuição
+## Fonte oficial e privacidade
 
-Na conta GitHub `fabriciomatosqa`, criar **um repositório PÚBLICO** exclusivo para os binários:
+O código-fonte permanece PRIVADO em:
+`fabriciomatosqa/Aurora-calculadorafarmaceutica`
 
+O APK assinado e seu checksum devem ser publicados como GitHub Release em:
 `fabriciomatosqa/aurora-calculadora-farmaceutica-updates`
 
-Um repositório com README inicial basta. **Não copiar o código-fonte do aplicativo para ele.** Apenas versões APK Android assinadas e seu checksum serão publicados por CI. Se preferir outro nome, configure-o nas preferências do aplicativo.
+Esse endereço é **fixo no aplicativo e na workflow**, não configurável pelo
+usuário final. Nenhum token de acesso ao GitHub é empacotado no APK. Apenas os
+binários de distribuição ficam públicos, não o código-fonte.
 
-## 2. Configurar autorização restrita no GitHub Actions do projeto privado
+**Dependência operacional:** o canal acima deve existir como repositório PÚBLICO,
+com Release do APK assinado. Se não existir ou não tiver releases, a atualização
+não estará disponível; o app mantém as funções locais. Em 24/10/2026, a
+existência desse repositório público ainda não estava confirmada.
 
-Na interface GitHub do repositório privado `Aurora-calculadorafarmaceutica`:
+## Preparação ÚNICA pelo mantenedor (não pelo usuário do app)
 
-- `Settings > Secrets and variables > Actions > Variables`: definir `AURORA_PUBLIC_RELEASE_REPO` com o valor `fabriciomatosqa/aurora-calculadora-farmaceutica-updates`.
-- Criar um **fine-grained personal access token** de curta duração com acesso **somente** ao repositório público de distribuição, permissão **Contents: Read and write**.
-- `Settings > Secrets and variables > Actions > Secrets`: definir `AURORA_PUBLIC_RELEASE_TOKEN` com o token. Nunca incluir no aplicativo, código, README ou workflow em texto.
+1. Criar o repositório PÚBLICO `aurora-calculadora-farmaceutica-updates`
+   na conta `fabriciomatosqa`. Apenas arquivos APK e .sha256 devem ser
+   publicados nele.
+2. Gerar um keystore de release Android estável; manter backups seguros.
+   Configurar os quatro secrets do Actions no repositório privado:
+   `AURORA_KEYSTORE_BASE64`, `AURORA_KEYSTORE_PASSWORD`,
+   `AURORA_KEY_ALIAS`, `AURORA_KEY_PASSWORD`.
+3. Criar um fine-grained PAT com autorização **Contents read/write apenas
+   para o repositório público de distribuição** e registrá-lo como secret
+   `AURORA_PUBLIC_RELEASE_TOKEN` no repositório privado.
+4. Na `.github/workflows/android.yml`, o endereço de distribuição já está
+   configurado: não é necessária a variável `AURORA_PUBLIC_RELEASE_REPO`.
+5. Publicar na `main` com `version: X.Y.Z+N` crescente em `pubspec.yaml`.
+   A Actions executa testes, compila o APK, calcula SHA-256 e publica Release
+   versionado no canal público se secrets e permissões estiverem corretos.
 
-A workflow usa esse token APENAS na etapa final para criar o Release no repositório público. Sem ele, salva o APK assinado como **Artifact** e emite aviso, mas não disponibiliza atualização automática.
+Não inserir senhas/tokens no repositório nem no app. A publicação do APK não
+deve depender de um campo preenchido no aparelho.
 
-## 3. Assinatura Android estável (necessária para atualizar sobre instalação existente)
+## Assinatura e migração de instalações antigas
 
-Gere no seu computador um keystore próprio e seguro, e guarde backup em local protegido:
+Android só permite substituir a instalação atual quando o novo APK usa o
+**mesmo applicationId e certificado de assinatura**. O APK de teste debug
+gerado pelo Actions em runner efêmero normalmente NÃO compartilha o
+certificado com uma versão release. Para esses casos, pode ser preciso
+desinstalar a versão debug e instalar a release; fazer backup de dados antes.
+Após a primeira instalação release, preservar o mesmo keystore em todas as
+versões futuras.
 
-```bash
-keytool -genkeypair -v -keystore aurora-release.jks -keyalg RSA -keysize 3072 -validity 10000 -alias aurora -storetype PKCS12
-```
+## Checklist de validação
 
-No repositório de código, configure quatro **Actions Secrets**:
+- Confirmar o Release público acessível sem autenticação e com
+  `aurora-calculadora-farmaceutica-vX.Y.Z-android.apk` e o arquivo
+  `.apk.sha256`.
+- Testar em Android físico upgrade de duas versões release assinadas com a
+  mesma chave e aumento de versionCode.
+- Testar app sem internet, 404, checksum inválido, falta de armazenamento,
+  cancelamento do instalador, retorno ao app e atualização manual.
+- Nenhuma atualização automática de APK foi validada em Android físico por
+  esta alteração de código; validar antes de distribuir.
 
-- `AURORA_KEYSTORE_BASE64`: conteúdo binário do keystore em Base64.
-- `AURORA_KEYSTORE_PASSWORD`: senha do arquivo.
-- `AURORA_KEY_ALIAS`: alias do certificado.
-- `AURORA_KEY_PASSWORD`: senha da chave.
-
-Em PowerShell Windows: `[Convert]::ToBase64String([IO.File]::ReadAllBytes('aurora-release.jks'))`.
-
-**Nunca publique keystore ou senhas**. Guarde a chave de assinatura por toda a vida do produto. A mesma chave deve assinar todas as versões futuras. A equipe deve verificar assinatura real com `apksigner verify --print-certs` e testar uma atualização de ponta a ponta no aparelho.
-
-A instalação **debug** inicial e a instalação **release** normalmente são assinadas com certificados diferentes. Android **não permite atualizar uma instalação debug para release usando assinatura diferente**. Neste caso, faça backup dos dados locais conforme suporte do app e instale a versão release limpa. Não prometa preservação de dados na migração debug→release.
-
-## 4. Como publicar versões novas
-
-Cada push à `main` executa testes e compila um APK de depuração como Actions Artifact. **Somente** se os quatro secrets de assinatura existirem, a CI faz `flutter build apk --release`, gera o arquivo:
-
-`aurora-calculadora-farmaceutica-vX.Y.Z-android.apk`
-
-Também gera `.apk.sha256`. Se token e variável do canal público estiverem configurados, a CI cria automaticamente o GitHub Release `vX.Y.Z` no repositório público. O código-fonte permanece privado.
-
-Em versões futuras, atualize `version: X.Y.Z+N` no `pubspec.yaml`, com `N` crescente. Nunca reescreva arquivos de um Release existente.
-
-Depois de configurar o repositório público e a assinatura, execute manualmente o workflow Android (ou faça novo push à main). A publicação automática só acontece se os testes, validações e build forem bem-sucedidos.
-
-## 5. No aplicativo Android
-
-- Abrir AURORA: verifica silenciosamente se há atualização; sem conectividade, os cálculos offline não são prejudicados.
-- No ícone engrenagem **Configurar atualizações**, informar o repositório público, no formato `fabriciomatosqa/nome-do-repo`. Configuração permanece salva no aparelho.
-- No ícone **Verificar atualizações**, fazer checagem manual. Caso canal esteja inacessível, app apresenta mensagem e opção de configurar.
-- Se surgir uma versão maior, ler as notas, escolher **Atualizar**; o APK é baixado com indicador de progresso, o hash conferido e o instalador do Android aberto. O usuário deve consentir com a instalação e com eventual permissão do Android para arquivos desta origem.
-
-A checagem automática não precisa de token nem de acesso ao GitHub privado. Não há instalação silenciosa, contorno de assinatura ou autoatualização em background.
-
-## 6. Segurança, Play Store e teste real
-
-Esta arquitetura destina-se à **distribuição direta fora da Play Store**. Ao publicar pela Play, seguir política de `REQUEST_INSTALL_PACKAGES` e adotar atualização da loja. Validar em Android físico instalação original, atualização entre duas versões release assinadas, hash inválido, ausência de rede, 404, falhas de download e falta de espaço.
-
-Para uso farmacêutico regulamentado, continuam necessários revisão das fórmulas e validação profissional; o mecanismo de atualização não valida cálculos, prescrições ou registros.
+Para uso farmacêutico profissional, as fórmulas e resultados continuam
+dependendo de validação por especialista; atualizar o app não valida
+automaticamente conteúdos técnicos nem prescrições.

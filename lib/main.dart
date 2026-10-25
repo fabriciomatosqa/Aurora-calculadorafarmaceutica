@@ -201,7 +201,7 @@ class _CalculatorHomeState extends State<CalculatorHome> with WidgetsBindingObse
       if (!mounted) return;
       Navigator.of(context, rootNavigator: true).pop();
       dialogClosed = true;
-      await _updates.requestInstallation(apk);
+      await _updates.requestInstallation(apk, release: release);
     } on UpdateException catch (error) {
       if (mounted) {
         if (!dialogClosed) {

@@ -1,4 +1,31 @@
-# Atualização online do AURORA — Android v0.5.0
+# Atualização online do AURORA — Android v0.6.2
+
+## O erro "o pacote tem um conflito com um pacote já existente"
+
+Se o arquivo que você está instalando é `app-debug.apk` de um Artifact `aurora-farmaceutica-debug-N`, **não é o APK oficial de atualização**. Esses APKs de teste foram gerados em máquinas temporárias do GitHub Actions e podiam usar certificados diferentes entre execuções. O Android bloqueia atualização com assinatura distinta, mesmo com o mesmo nome e package ID.
+
+A partir da v0.6.2, a CI isola builds de teste sob `br.com.aurora.aurora_calculadora_farmaceutica.debug`. Eles não substituem o pacote de produção `br.com.aurora.aurora_calculadora_farmaceutica`. Os Artifacts de teste são explicitamente identificados como **NÃO ATUALIZA**.
+
+A CI publica um Release instalável somente se quatro Secrets de assinatura persistente estiverem configurados. O fluxo valida o ID de pacote, `versionCode` e assinatura via `apksigner`, publicando também `assinatura-android.txt` para permitir conferência da impressão digital do certificado. Sem assinatura, o workflow indica falha de distribuição; a execução não deve ser considerada uma entrega online bem-sucedida.
+
+### Configuração inicial obrigatória para atualizar sem reinstalar posteriormente
+
+1. No seu PC, localize a **chave original** (keystore) usada para assinar o aplicativo que deseja manter. Se existir, reutilize-a, com alias e senha correspondentes.
+2. Configure os quatro Secrets `AURORA_KEYSTORE_BASE64`, `AURORA_KEYSTORE_PASSWORD`, `AURORA_KEY_ALIAS` e `AURORA_KEY_PASSWORD` em `Settings → Secrets and variables → Actions`.
+3. Execute o workflow Android e confirme que o job gerou um Release (não somente um Artifact), com `aurora-calculadora-farmaceutica-vX.Y.Z-android.apk`, `.sha256` e `assinatura-android.txt`.
+4. Após uma instalação Release **assinada pela mesma chave** do aplicativo já instalado, a atualização poderá acontecer pela interface do AURORA. O Android continuará pedindo confirmação.
+5. **Se a instalação atual for debug e a chave original estiver perdida**, não há correção de código que permita sobrepor o APK sem a assinatura anterior. Preserve os dados existentes antes de qualquer desinstalação; a primeira migração para o Release definitivo pode exigir reinstalação e pode apagar favoritos/configurações. Não desinstale sem avaliar esses dados.
+
+Para confirmar a assinatura de dois APKs no computador com Android SDK:
+
+```bash
+apksigner verify --print-certs app-antigo.apk
+apksigner verify --print-certs aurora-calculadora-farmaceutica-vX.Y.Z-android.apk
+```
+
+Compare `Signer #1 certificate SHA-256 digest` e o mesmo nome de pacote via `aapt dump badging`. Se diferentes, a atualização é incompatível.
+
+
 
 ## Como funciona
 
@@ -16,10 +43,10 @@ A consulta na abertura não interfere no uso offline das calculadoras. O botão 
 
 O workflow `.github/workflows/android.yml` executa no push para `main`:
 
-1. Gera os arquivos de plataforma Android necessários com `flutter create`.
+1. Gera os arquivos de plataforma Android necessários com `flutter create`, isolando o package ID de DEBUG.
 2. Configura permissões de internet e instalador Android.
 3. Executa `flutter analyze` e `flutter test`, com diagnóstico nos logs em caso de erro.
-4. Compila APK de teste (debug), como Artifact de GitHub Actions.
+4. Compila APK de teste (debug), com package ID distinto e identificado como **NÃO ATUALIZA** nos Artifacts.
 5. Se a assinatura de distribuição estiver configurada, compila um APK **release assinado**.
 6. Gera o arquivo `aurora-calculadora-farmaceutica-vX.Y.Z-android.apk` e seu `.apk.sha256`.
 7. Publica o Release **no próprio repositório público**, usando `github.token`. Não é necessário criar outro repositório ou adicionar um token pessoal para publicação.

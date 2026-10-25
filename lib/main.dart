@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'domain/calculator.dart';
+import 'features/prescription/prescription_screen.dart';
 import 'services/update_service.dart';
 
 void main() {
@@ -71,6 +72,7 @@ IconData categoryIcon(CalculatorCategory category) => switch (category) {
       CalculatorCategory.solutions => Icons.science_outlined,
       CalculatorCategory.quality => Icons.verified_outlined,
       CalculatorCategory.production => Icons.precision_manufacturing_outlined,
+      CalculatorCategory.prescriptions => Icons.medication_outlined,
     };
 
 class CalculatorHome extends StatefulWidget {
@@ -417,7 +419,7 @@ class _CalculatorHomeState extends State<CalculatorHome> with WidgetsBindingObse
         Text('Precisão em cada cálculo.',
             style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800)),
         SizedBox(height: 9),
-        Text('21 ferramentas, fórmulas explicadas e resultados instantâneos. Funciona offline.',
+        Text('22 ferramentas, fórmulas explicadas e resultados instantâneos. Funciona offline.',
             style: TextStyle(color: Color(0xFFE2E7FA), fontSize: 14, height: 1.5)),
         SizedBox(height: 14),
         Row(children: [
@@ -449,11 +451,13 @@ class _CalculatorHomeState extends State<CalculatorHome> with WidgetsBindingObse
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
         onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
-          builder: (_) => CalculatorDetail(
-            calculator: calc,
-            favorite: starred,
-            onFavorite: () => _toggleFavorite(calc.id),
-          ),
+          builder: (_) => calc.id == 'prescription_units'
+              ? const PrescriptionScreen()
+              : CalculatorDetail(
+                  calculator: calc,
+                  favorite: starred,
+                  onFavorite: () => _toggleFavorite(calc.id),
+                ),
         )).then((_) { if (mounted) setState(() {}); }),
         child: Padding(
           padding: const EdgeInsets.all(16),

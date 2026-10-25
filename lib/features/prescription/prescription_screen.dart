@@ -293,6 +293,7 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
               ),
               const SizedBox(height: 14),
               DropdownButtonFormField<PharmaceuticalForm>(
+                key: ValueKey(_form),
                 initialValue: _form,
                 isExpanded: true,
                 decoration: const InputDecoration(

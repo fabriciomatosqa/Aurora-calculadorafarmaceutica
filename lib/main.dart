@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -113,6 +112,73 @@ class _CalculatorHomeState extends State<CalculatorHome> with WidgetsBindingObse
     }
   }
 
+  Future<void> _configureUpdates() async {
+    String repository;
+    try {
+      repository = await _updates.configuredRepository();
+    } on UpdateException catch (error) {
+      if (mounted) _message(error.message);
+      return;
+    }
+    if (!mounted) return;
+    final field = TextEditingController(text: repository);
+    try {
+      final selected = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Configurar atualizações'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Informe o repositório PÚBLICO que disponibiliza os '
+                'APKs assinados do AURORA. O repositório privado de '
+                'código-fonte não pode ser usado diretamente.',
+              ),
+              const SizedBox(height: 15),
+              TextField(
+                controller: field,
+                autocorrect: false,
+                decoration: const InputDecoration(
+                  labelText: 'Repositório público',
+                  hintText: 'fabriciomatosqa/aurora-calculadora-farmaceutica-updates',
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Nenhuma senha ou token do GitHub deve ser informado aqui. '
+                'Somente repositórios da conta fabriciomatosqa são aceitos.',
+                style: TextStyle(fontSize: 12),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, field.text),
+              child: const Text('Salvar canal'),
+            ),
+          ],
+        ),
+      );
+      if (selected == null || !mounted) return;
+      await _updates.configureRepository(selected);
+      if (!mounted) return;
+      _message('Canal salvo. Verificando versões disponíveis...');
+      await _checkForUpdates(automatic: false);
+    } on UpdateException catch (error) {
+      if (mounted) _message(error.message, settingsAction: true);
+    } catch (_) {
+      if (mounted) _message('Não foi possível salvar a configuração.');
+    } finally {
+      field.dispose();
+    }
+  }
+
   Future<void> _checkForUpdates({required bool automatic}) async {
     if (_checkingForUpdates) return;
     _checkingForUpdates = true;
@@ -140,12 +206,6 @@ class _CalculatorHomeState extends State<CalculatorHome> with WidgetsBindingObse
                   style: const TextStyle(fontSize: 12))),
               ),
             ],
-            if (Platform.isIOS) ...[
-              const SizedBox(height: 10),
-              const Text('No iPhone, a instalação deve seguir o canal '
-                  'de distribuição Apple. A página informa as novidades.',
-                  style: TextStyle(fontSize: 12)),
-            ],
           ]),
           actions: [
             TextButton(onPressed: () => Navigator.pop(dialogContext, false),
@@ -156,13 +216,11 @@ class _CalculatorHomeState extends State<CalculatorHome> with WidgetsBindingObse
         ),
       );
       if (!mounted || shouldUpdate != true) return;
-      if (Platform.isAndroid) {
-        await _downloadAndInstall(release);
-      } else {
-        await launchUrl(release.pageUrl, mode: LaunchMode.externalApplication);
-      }
+      await _downloadAndInstall(release);
     } on UpdateException catch (error) {
-      if (!automatic && mounted) _message(error.message);
+      if (!automatic && mounted) {
+        _message(error.message, settingsAction: true);
+      }
     } catch (_) {
       if (!automatic && mounted) {
         _message('Não foi possível verificar atualizações. Confira a internet.');
@@ -236,10 +294,19 @@ class _CalculatorHomeState extends State<CalculatorHome> with WidgetsBindingObse
     }
   }
 
-  void _message(String value) {
+  void _message(String value, {bool settingsAction = false}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(value)),
+      SnackBar(
+        content: Text(value),
+        duration: Duration(seconds: settingsAction ? 9 : 4),
+        action: settingsAction
+            ? SnackBarAction(
+                label: 'Configurar',
+                onPressed: () => unawaited(_configureUpdates()),
+              )
+            : null,
+      ),
     );
   }
 
@@ -295,6 +362,11 @@ class _CalculatorHomeState extends State<CalculatorHome> with WidgetsBindingObse
         ]),
         actions: [
           IconButton(
+            tooltip: 'Configurar atualizações',
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: _configureUpdates,
+          ),
+          IconButton(
             tooltip: 'Verificar atualizações',
             icon: const Icon(Icons.system_update_alt_rounded),
             onPressed: () => _checkForUpdates(automatic: false),
@@ -305,7 +377,7 @@ class _CalculatorHomeState extends State<CalculatorHome> with WidgetsBindingObse
             onPressed: () => showAboutDialog(
               context: context,
               applicationName: 'AURORA Calculadora Farmacêutica',
-              applicationVersion: '0.3.0',
+              applicationVersion: '0.4.0',
               children: [
                 const Text('Ferramenta educacional e de apoio técnico. Não validada para liberação de lotes, decisão clínica ou substituição de métodos e procedimentos aprovados.'),
                 const SizedBox(height: 10),

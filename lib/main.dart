@@ -222,7 +222,7 @@ class _CalculatorHomeState extends State<CalculatorHome> with WidgetsBindingObse
         release,
         onProgress: (received, total) {
           if (total > 0) {
-            progress.value = (received / total).clamp(0.0, 1.0);
+            progress.value = (received / total).clamp(0.0, 1.0).toDouble();
           }
         },
       );

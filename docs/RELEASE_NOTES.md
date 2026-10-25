@@ -1,17 +1,18 @@
-# AURORA Calculadora Farmacêutica v0.6.0 — Android
+# AURORA Calculadora Farmacêutica v0.6.1 — Android
 
-## Novidades
+## Correções desta versão
 
-- **Prescrições → Importar prescrição**: nova área em destaque no topo da tela, com acesso a câmera, galeria e seletor de arquivo PDF/JPG/PNG.
-- Leitura de fotos e imagens com reconhecimento de texto (OCR) executado no dispositivo; extração de texto de PDFs digitais, sem upload a servidor.
-- Texto extraído editável e conferível. Sugestões limitadas de apresentação, dose e frequência só são copiadas para a calculadora com confirmação do usuário.
-- Limite máximo diário **não é inferido**: o profissional deve continuar informando e conferindo a fonte aplicável.
-- **Favoritos como primeira aba**, antes de Todas e das categorias.
-- Atualizações pelo próprio app continuam consultando os Releases oficiais, sem baixar APK manualmente no GitHub; o Android solicita confirmação para a instalação.
+- Corrige erro na compilação Android causado pela incompatibilidade do file_picker 11.0.3 com Android Gradle Plugin 9.
+- Atualiza o seletor de documentos para file_picker 12.3.x, com suporte a PDF, JPG, JPEG e PNG.
+- Corrige acesso a arquivos selecionados pelo Android Storage Access Framework (SAF), processando-os temporariamente em armazenamento privado e removendo a cópia após o uso.
+- Mantém em Prescrições os três botões evidentes: Tirar foto, Galeria e Arquivo / PDF, com revisão obrigatória dos campos extraídos.
+- Mantém Favoritos como a primeira aba.
+- A checagem de atualização permanece integrada ao aplicativo e consulta as Releases oficiais do GitHub, com download interno, conferência do SHA-256 e abertura do instalador Android.
 
-## Limitações e segurança
+## Segurança e implantação
 
-- PDFs digitalizados sem camada de texto exigem uma foto/imagem para OCR nesta versão.
-- OCR pode confundir números, medicamentos, frequências e unidades, especialmente em receitas manuscritas; o resultado não é avaliação clínica nem autorização de dispensação.
-- A atualização sobre versão instalada exige mesmo package ID e certificado de assinatura. A CI publica o APK release somente com secrets de assinatura configurados.
-- Projeto em fase de teste, não validado para processos regulamentados.
+As prescrições são processadas no aparelho. A leitura automática não valida a receita nem define a dose máxima. Os campos extraídos exigem revisão profissional.
+
+A atualização sobre uma instalação Android existente depende de assinatura e identificador de pacote compatíveis; a implantação do Release requer secrets de assinatura corretamente configurados no GitHub Actions.
+
+**Atenção:** aplicação técnica ainda sem validação para atividades farmacêuticas regulamentadas.

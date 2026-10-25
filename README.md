@@ -1,8 +1,8 @@
 # AURORA Calculadora Farmacêutica
 
-Aplicativo Flutter multiplataforma, com interface em português, **21 calculadoras gerais** para soluções, controle de qualidade e produção farmacêutica. Os cálculos funcionam offline no Android e no iOS; interface clara/escura automática, busca, favoritos locais e cópia de entradas/resultados.
+Aplicativo Flutter com foco exclusivo na versão **Android**, em português, com **22 calculadoras** para soluções, qualidade, produção e avaliação matemática de prescrições. Os cálculos funcionam offline; inclui interface clara/escura, pesquisa, favoritos locais e cópia de resultados. O iOS está fora das prioridades de desenvolvimento.
 
-> **ATENÇÃO — Protótipo técnico v0.2.0.** Não validado para uso em ambiente regulado, decisão clínica, liberação/reprovação de lotes ou substituição de POPs e métodos aprovados. Toda fórmula, unidade, precisão, arredondamento, faixa, rastreabilidade e condição de aplicação deve ser avaliada pelo responsável técnico antes do uso operacional. Nenhum resultado determina conformidade.
+> **ATENÇÃO — Protótipo técnico v0.3.0.** Não validado para uso em ambiente regulado, decisão clínica, liberação/reprovação de lotes ou substituição de POPs e métodos aprovados. Toda fórmula, unidade, precisão, arredondamento, faixa, rastreabilidade e condição de aplicação deve ser avaliada pelo responsável técnico antes do uso operacional. Nenhum resultado determina conformidade.
 
 ## Calculadoras
 
@@ -12,7 +12,9 @@ Aplicativo Flutter multiplataforma, com interface em português, **21 calculador
 
 **Produção (5):** rendimento de lote, perda de processo, escalonamento, massa teórica de comprimidos, vazão volumétrica.
 
-Cada tela informa unidades fixas, fórmula e limitações. Valores monetários ou clínicos não fazem parte do escopo da versão 0.2.0. Em DPR, separar medições por ponto e vírgula ou linhas (vírgula pode ser separador decimal).
+**Prescrições (1):** quantidade de comprimidos/cápsulas/sachês inteiros ou volume de líquidos orais para tratamento de dose fixa; comparação da dose diária calculada com limite *informado* e estimativa opcional de embalagens. Veja [regras, validações, limitações e fontes](docs/PRESCRICOES.md).
+
+Cada tela informa unidades fixas, fórmula e limitações. Valores monetários ou clínicos não fazem parte do escopo da versão 0.3.0. Em DPR, separar medições por ponto e vírgula ou linhas (vírgula pode ser separador decimal).
 
 ## Android — construir e obter APK
 
@@ -33,7 +35,7 @@ flutter build apk --debug
 
 Saída típica: `build/app/outputs/flutter-apk/app-debug.apk`.
 
-## Atualização pelo aplicativo (v0.2.0)
+## Atualização pelo aplicativo (v0.3.0)
 
 O app verifica automaticamente a existência de uma nova versão no GitHub **toda vez que a tela inicial abre**, sem travar cálculos offline. Também há um botão **Verificar atualizações** no topo.
 
@@ -45,7 +47,11 @@ Quando uma nova Release pública está disponível, ele pergunta se deseja atual
 
 Leia **[Configuração do atualizador, assinatura e distribuição](docs/ATUALIZACOES.md)** antes de instalar a primeira versão.
 
-## iOS — projeto, simulador e distribuição
+## iOS — fora de escopo no momento
+
+O trabalho atual é exclusivamente Android. O workflow iOS legado permanece no repositório, mas não participa da compilação Android e não integra as prioridades presentes.
+
+## Registro anterior: iOS — instruções mantidas para uso futuro
 
 **iOS não usa APK.** O código Flutter é compartilhado; para testar no iPhone ou gerar IPA é necessário ambiente **macOS com Xcode**, provisionamento e assinatura Apple adequados.
 
@@ -66,6 +72,9 @@ Para distribuição real, configurar equipe Apple, Bundle ID, certificados/profi
 
 - `lib/main.dart`: interface e experiência mobile;
 - `lib/domain/calculator.dart`: catálogo e matemática desacoplada;
+- `lib/domain/prescription.dart`: domínio isolado para unidades de prescrições;
+- `lib/features/prescription/prescription_screen.dart`: formulário e avisos da prescrição;
+- `test/prescription_test.dart`: testes matemáticos e alertas;
 - `lib/services/update_service.dart`: verificação de GitHub Releases, SHA-256 e instalador Android;
 - `scripts/configure_android.py`: configuração do Android e assinatura via secrets;
 - `test/`: casos unitários, limites e teste de interface;

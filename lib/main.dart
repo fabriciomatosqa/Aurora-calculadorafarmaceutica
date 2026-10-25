@@ -305,7 +305,7 @@ class _CalculatorHomeState extends State<CalculatorHome> with WidgetsBindingObse
             onPressed: () => showAboutDialog(
               context: context,
               applicationName: 'AURORA Calculadora Farmacêutica',
-              applicationVersion: '0.2.0',
+              applicationVersion: '0.3.0',
               children: [
                 const Text('Ferramenta educacional e de apoio técnico. Não validada para liberação de lotes, decisão clínica ou substituição de métodos e procedimentos aprovados.'),
                 const SizedBox(height: 10),

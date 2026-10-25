@@ -75,14 +75,14 @@ jobs:
           if-no-files-found: error
           retention-days: 30
       - name: Compilar APK release assinado
-        if: env.AURORA_RELEASE_READY == 'true'
+        if: github.ref == 'refs/heads/main' && env.AURORA_RELEASE_READY == 'true'
         env:
           AURORA_KEYSTORE_PASSWORD: ${{ secrets.AURORA_KEYSTORE_PASSWORD }}
           AURORA_KEY_ALIAS: ${{ secrets.AURORA_KEY_ALIAS }}
           AURORA_KEY_PASSWORD: ${{ secrets.AURORA_KEY_PASSWORD }}
         run: flutter build apk --release
       - name: Montar APK versionado e checksum
-        if: env.AURORA_RELEASE_READY == 'true'
+        if: github.ref == 'refs/heads/main' && env.AURORA_RELEASE_READY == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -97,7 +97,7 @@ jobs:
           echo "AURORA_VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "AURORA_APK_NAME=$NAME" >> "$GITHUB_ENV"
       - name: Publicar release APK como artifact
-        if: env.AURORA_RELEASE_READY == 'true'
+        if: github.ref == 'refs/heads/main' && env.AURORA_RELEASE_READY == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: aurora-farmaceutica-release-${{ github.run_number }}
@@ -105,7 +105,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
       - name: Publicar APK assinado no repositório PÚBLICO de distribuição
-        if: env.AURORA_RELEASE_READY == 'true'
+        if: github.ref == 'refs/heads/main' && env.AURORA_RELEASE_READY == 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.AURORA_PUBLIC_RELEASE_TOKEN }}

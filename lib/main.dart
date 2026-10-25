@@ -509,19 +509,19 @@ class _CalculatorHomeState extends State<CalculatorHome> with WidgetsBindingObse
         ),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
+        const Row(children: [
           Icon(Icons.science_rounded, color: _aqua, size: 18),
           SizedBox(width: 8),
           Text('LABORATÓRIO • QUALIDADE • PRODUÇÃO',
               style: TextStyle(color: _aqua, fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 0.8)),
         ]),
-        SizedBox(height: 16),
-        Text('Precisão em cada cálculo.',
+        const SizedBox(height: 16),
+        const Text('Precisão em cada cálculo.',
             style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800)),
-        SizedBox(height: 9),
-        Text('22 calculadoras, leitura de prescrição por foto e resultados locais.',
+        const SizedBox(height: 9),
+        const Text('22 calculadoras, leitura de prescrição por foto e resultados locais.',
             style: TextStyle(color: Color(0xFFE2E7FA), fontSize: 14, height: 1.5)),
-        SizedBox(height: 14),
+        const SizedBox(height: 14),
         const Row(children: [
           Icon(Icons.shield_outlined, color: Color(0xFFB3EAFF), size: 16),
           SizedBox(width: 8),

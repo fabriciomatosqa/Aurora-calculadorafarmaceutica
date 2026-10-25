@@ -102,19 +102,35 @@ jobs:
           path: dist/
           if-no-files-found: error
           retention-days: 30
-      - name: Publicar GitHub Release da versão
+      - name: Publicar APK assinado no repositório PÚBLICO de distribuição
         if: env.AURORA_RELEASE_READY == 'true'
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.AURORA_PUBLIC_RELEASE_TOKEN }}
+          DISTRIBUTION_REPO: ${{ vars.AURORA_PUBLIC_RELEASE_REPO }}
         run: |
           set -euo pipefail
+          if [[ -z "$GH_TOKEN" || -z "$DISTRIBUTION_REPO" ]]; then
+            echo "::warning::Atualização pública pendente: configure o repositório público e AURORA_PUBLIC_RELEASE_TOKEN."
+            echo "APK assinado nos Artifacts, mas ainda NÃO acessível pelo atualizador online." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [[ ! "$DISTRIBUTION_REPO" =~ ^fabriciomatosqa/[A-Za-z0-9._-]+$ ]]; then
+            echo "::error::AURORA_PUBLIC_RELEASE_REPO deve ser da conta fabriciomatosqa"
+            exit 1
+          fi
+          if [[ "$(gh api "repos/$DISTRIBUTION_REPO" --jq '.private')" != "false" ]]; then
+            echo "::error::O repositório de distribuição precisa ser público"
+            exit 1
+          fi
           TAG="v${AURORA_VERSION}"
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Release $TAG already exists. Increase pubspec version for next release."
+          if gh release view "$TAG" --repo "$DISTRIBUTION_REPO" >/dev/null 2>&1; then
+            echo "Release $TAG já está publicado no canal público. Não sobrescrevendo."
             exit 0
           fi
           gh release create "$TAG" "dist/${AURORA_APK_NAME}" "dist/${AURORA_APK_NAME}.sha256" \
-            --target "$GITHUB_SHA" --title "AURORA Calculadora Farmacêutica $TAG" \
-            --notes "APK Android assinado. Confira as alterações e valide o aplicativo antes de uso regulado." \
+            --repo "$DISTRIBUTION_REPO" \
+            --title "AURORA Calculadora Farmacêutica $TAG" \
+            --notes "Nova versão Android. Baixe o APK assinado e confirme a instalação no dispositivo." \
             --latest
+          echo "Atualização disponível: https://github.com/$DISTRIBUTION_REPO/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"

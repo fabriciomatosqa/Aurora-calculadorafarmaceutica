@@ -55,11 +55,29 @@ jobs:
         run: |
           set -o pipefail
           flutter test 2>&1 | tee .ci-logs/flutter-test.log
-      - name: Compilar APK de teste
+      - name: Compilar APK de teste (pacote separado da produção)
         shell: bash
         run: |
           set -o pipefail
           flutter build apk --debug 2>&1 | tee .ci-logs/flutter-build-android.log
+      - name: Verificar identificador do APK de teste
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK_PATH="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          if [[ -z "$SDK_PATH" ]]; then
+            echo "::error::ANDROID_HOME/ANDROID_SDK_ROOT ausente"
+            exit 1
+          fi
+          BUILD_TOOLS="$(find "$SDK_PATH/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          DEBUG_APK="build/app/outputs/flutter-apk/app-debug.apk"
+          ID="$("$BUILD_TOOLS/aapt" dump badging "$DEBUG_APK" | sed -n "s/^package: name='\\([^']*\\)'.*/\\1/p")"
+          echo "Pacote DEBUG: $ID"
+          if [[ "$ID" != "br.com.aurora.aurora_calculadora_farmaceutica.debug" ]]; then
+            echo "::error::O APK DEBUG usa o mesmo pacote da produção. Evitando novas colisões."
+            exit 1
+          fi
+          echo "DEBUG separado: não substitui o aplicativo oficial" >> "$GITHUB_STEP_SUMMARY"
       - name: Guardar logs quando o job falhar
         if: failure()
         uses: actions/upload-artifact@v4
@@ -71,7 +89,7 @@ jobs:
       - name: Publicar APK de teste nos Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: aurora-farmaceutica-debug-${{ github.run_number }}
+          name: aurora-TESTE-debug-NAO-ATUALIZA-${{ github.run_number }}
           path: build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: error
           retention-days: 30
@@ -82,6 +100,34 @@ jobs:
           AURORA_KEY_ALIAS: ${{ secrets.AURORA_KEY_ALIAS }}
           AURORA_KEY_PASSWORD: ${{ secrets.AURORA_KEY_PASSWORD }}
         run: flutter build apk --release
+      - name: Conferir pacote e assinatura de distribuição
+        if: env.AURORA_RELEASE_READY == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK_PATH="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          BUILD_TOOLS="$(find "$SDK_PATH/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          APK="build/app/outputs/flutter-apk/app-release.apk"
+          PACKAGE="$("$BUILD_TOOLS/aapt" dump badging "$APK" | sed -n "s/^package: name='\\([^']*\\)'.*/\\1/p")"
+          VERSION_CODE="$("$BUILD_TOOLS/aapt" dump badging "$APK" | sed -n "s/^package: .*versionCode='\\([^']*\\)'.*/\\1/p")"
+          echo "Pacote RELEASE: $PACKAGE / versão $VERSION_CODE"
+          if [[ "$PACKAGE" != "br.com.aurora.aurora_calculadora_farmaceutica" ]]; then
+            echo "::error::ID do pacote mudou: atualizações sobre instalações antigas serão recusadas"
+            exit 1
+          fi
+          EXPECTED_BUILD="${GITHUB_REF_NAME:+$(sed -n 's/^version: [^+]*+\\([0-9][0-9]*\\).*/\\1/p' pubspec.yaml)}"
+          if [[ -z "$EXPECTED_BUILD" || "$VERSION_CODE" != "$EXPECTED_BUILD" ]]; then
+            echo "::error::versionCode APK ($VERSION_CODE) difere do pubspec ($EXPECTED_BUILD)"
+            exit 1
+          fi
+          "$BUILD_TOOLS/apksigner" verify --print-certs "$APK" | tee signing-report.txt
+          CERT_SHA="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' signing-report.txt | head -n 1)"
+          if [[ ! "$CERT_SHA" =~ ^[[:xdigit:]]{64}$ ]]; then
+            echo "::error::Não foi possível validar o certificado de assinatura"
+            exit 1
+          fi
+          echo "Certificado SHA-256: $CERT_SHA" >> "$GITHUB_STEP_SUMMARY"
+          echo "Atenção: preservar o MESMO certificado para todas as próximas versões." >> "$GITHUB_STEP_SUMMARY"
       - name: Montar APK versionado e checksum
         if: env.AURORA_RELEASE_READY == 'true'
         shell: bash
@@ -95,6 +141,7 @@ jobs:
           NAME="aurora-calculadora-farmaceutica-v${VERSION}-android.apk"
           cp build/app/outputs/flutter-apk/app-release.apk "dist/${NAME}"
           (cd dist && sha256sum "${NAME}" > "${NAME}.sha256")
+          cp signing-report.txt dist/assinatura-android.txt
           echo "AURORA_VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "AURORA_APK_NAME=$NAME" >> "$GITHUB_ENV"
       - name: Publicar release APK como artifact
@@ -119,7 +166,7 @@ jobs:
             echo "::notice::Release $TAG já existe. Aumente a versão em pubspec.yaml para uma nova atualização."
             exit 0
           fi
-          gh release create "$TAG" "dist/${AURORA_APK_NAME}" "dist/${AURORA_APK_NAME}.sha256" \
+          gh release create "$TAG" "dist/${AURORA_APK_NAME}" "dist/${AURORA_APK_NAME}.sha256" "dist/assinatura-android.txt" \
             --repo "$REPO" --target "$GITHUB_SHA" \
             --title "AURORA Calculadora Farmacêutica $TAG" \
             --notes-file docs/RELEASE_NOTES.md \
@@ -131,5 +178,7 @@ jobs:
         run: |
           echo "::warning::Nenhum APK release publicado: faltam secrets da chave de assinatura Android."
           echo "### Atualização online ainda não ativada" >> "$GITHUB_STEP_SUMMARY"
-          echo "O APK DEBUG desta execução está disponível somente como Actions Artifact." >> "$GITHUB_STEP_SUMMARY"
-          echo "Para publicar Releases instaláveis com atualizações, configure AURORA_KEYSTORE_BASE64, AURORA_KEYSTORE_PASSWORD, AURORA_KEY_ALIAS e AURORA_KEY_PASSWORD em Settings > Secrets and variables > Actions." >> "$GITHUB_STEP_SUMMARY"
+          echo "O APK DEBUG desta execução usa um pacote DIFERENTE e não serve para atualização do app oficial." >> "$GITHUB_STEP_SUMMARY"
+          echo "Configure AURORA_KEYSTORE_BASE64, AURORA_KEYSTORE_PASSWORD, AURORA_KEY_ALIAS e AURORA_KEY_PASSWORD em Settings > Secrets and variables > Actions." >> "$GITHUB_STEP_SUMMARY"
+          echo "::error::Não há chave de assinatura persistente. Não é possível garantir atualizações pelo app."
+          exit 1

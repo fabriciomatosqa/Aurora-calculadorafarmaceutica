@@ -105,8 +105,12 @@ AppRelease parseRelease(Map<String, dynamic> json) {
 }
 
 class UpdateService {
-  UpdateService({http.Client? client}) : _client = client ?? http.Client();
+  UpdateService({http.Client? client, String? installedVersionOverride})
+      : _client = client ?? http.Client(),
+        _installedVersionOverride = installedVersionOverride;
+
   final http.Client _client;
+  final String? _installedVersionOverride;
 
   static const _maxApkBytes = 150 * 1024 * 1024;
   static const _timeout = Duration(seconds: 20);
@@ -114,7 +118,7 @@ class UpdateService {
   void dispose() => _client.close();
 
   Future<String> installedVersion() async =>
-      (await PackageInfo.fromPlatform()).version;
+      _installedVersionOverride ?? (await PackageInfo.fromPlatform()).version;
 
   Future<AppRelease?> latestAvailable() async {
     final current = await installedVersion();

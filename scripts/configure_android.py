@@ -3,7 +3,6 @@
 import base64
 import os
 import pathlib
-import re
 import sys
 
 root = pathlib.Path(__file__).resolve().parents[1]
@@ -18,22 +17,31 @@ for p in (permission, install_permission):
         xml = xml.replace("<application", "    " + p + "\n    <application", 1)
 manifest.write_text(xml, encoding="utf-8")
 
+# Distinguish CI debug/test installs from the final production app.
+# Never distribute a debug APK as an update to a published release.
+gradle = root / "android/app/build.gradle.kts"
+if not gradle.exists():
+    sys.exit("Expected Flutter Kotlin Gradle template not found")
+source = gradle.read_text(encoding="utf-8")
+anchor = 'signingConfig = signingConfigs.getByName("debug")'
+if anchor not in source or "buildTypes {" not in source:
+    sys.exit("Unable to locate signing configuration in Android Gradle template")
+if 'applicationIdSuffix = ".debug"' not in source:
+    source = source.replace(
+        "buildTypes {",
+        'buildTypes {\n        getByName("debug") {\n            applicationIdSuffix = ".debug"\n        }',
+        1,
+    )
+
 names = ("AURORA_KEYSTORE_BASE64", "AURORA_KEYSTORE_PASSWORD",
          "AURORA_KEY_ALIAS", "AURORA_KEY_PASSWORD")
 present = [bool(os.getenv(k)) for k in names]
 if any(present) and not all(present):
     sys.exit("Incomplete signing secrets; all four are required")
 if not all(present):
-    print("Signing secrets absent: development APK only, no public release.")
+    gradle.write_text(source, encoding="utf-8")
+    print("Signing secrets absent: CI DEBUG is separate; no production release.")
     sys.exit(0)
-
-gradle = root / "android/app/build.gradle.kts"
-if not gradle.exists():
-    sys.exit("Expected Flutter Kotlin Gradle template not found")
-source = gradle.read_text(encoding="utf-8")
-anchor = 'signingConfig = signingConfigs.getByName("debug")'
-if anchor not in source:
-    sys.exit("Unable to locate debug signingConfig in Android Gradle template")
 
 key_path = pathlib.Path(os.getenv("RUNNER_TEMP", "/tmp")) / "aurora-release.jks"
 try:

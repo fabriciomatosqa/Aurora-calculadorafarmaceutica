@@ -8,6 +8,16 @@ Com base em uma prescrição legível e previamente avaliada pelo profissional, 
 
 Não substitui a revisão da prescrição pelo farmacêutico, a avaliação do paciente, nem o contato com o prescritor quando necessário.
 
+## Leitura de imagem — módulo de apoio (v0.5.0)
+
+- Foto pela câmera ou imagem da galeria na própria tela de Prescrição.
+- Texto por OCR local (ML Kit Latin), sem compartilhamento por API ou gravação de dados pessoais em banco local. A captura é temporária e pode ficar no cache do sistema.
+- OCR **não** produz avaliação clínica. Ao reconhecer vários medicamentos, apresenta candidatos separados e o farmacêutico os revisa um a um.
+- Campos ausentes não são inventados. Posologia variável, SOS e casos especiais requerem avaliação independente; uma foto borrada ou manuscrita pode não ser reconhecida.
+- Ao selecionar um candidato, os dados anteriores são apagados para evitar contaminação entre itens; a dose máxima e sua referência jamais são inferidas.
+- A confirmação de conferência é obrigatória após OCR e precisa ser refeita caso os campos sejam alterados.
+- O resultado numérico não autoriza dispensação ou prescrição.
+
 ## Dados necessários
 
 - Forma farmacêutica: comprimidos, cápsulas e sachês **inteiros**, ou soluções/suspensões orais expressas em mL.
@@ -58,6 +68,14 @@ O cálculo de caixas integrais **não autoriza** entrega de quantidade excedente
 4. [Ministério da Saúde — Protocolo de Segurança na Prescrição, Uso e Administração de Medicamentos](https://www.gov.br/saude/pt-br/composicao/saes/seguranca-do-paciente/publicacoes/protocolos-de-seguranca-do-paciente/protocolo-seguraca-na-prescricao-uso-e-administracao-de-medicamentos.pdf/view).
 
 ## Testes automatizados
+
+O parser conservador de OCR em `test/prescription_ocr_parser_test.dart`
+cobre dois medicamentos independentes, concentração líquida explícita, dose
+fixa, SOS, dados incompletos e texto sem medicamentos. Ainda pendem testes
+instrumentados no Android com receitas fictícias e análise de desempenho em
+aparelhos reais.
+
+
 
 `test/prescription_test.dart` cobre posologia fixa, sólidos e líquidos, arredondamento apenas de **embalagens comerciais**, erro para unidades sólidas fracionárias, limites diários, entrada inválida e preservação da dose prescrita.
 

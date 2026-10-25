@@ -295,7 +295,7 @@ class _CalculatorHomeState extends State<CalculatorHome> with WidgetsBindingObse
             onPressed: () => showAboutDialog(
               context: context,
               applicationName: 'AURORA Calculadora Farmacêutica',
-              applicationVersion: '0.5.0',
+              applicationVersion: '0.6.0',
               children: [
                 const Text('Ferramenta educacional e de apoio técnico. Não validada para liberação de lotes, decisão clínica ou substituição de métodos e procedimentos aprovados.'),
                 const SizedBox(height: 10),
@@ -334,12 +334,16 @@ class _CalculatorHomeState extends State<CalculatorHome> with WidgetsBindingObse
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: Row(children: [
+                        _filterChip('Favoritos', _onlyFavorites, () => setState(() {
+                          _onlyFavorites = true; _category = null;
+                        }), icon: Icons.star_outline),
                         _filterChip('Todas', _category == null && !_onlyFavorites, () => setState(() {
                           _category = null; _onlyFavorites = false;
                         })),
-                        ...CalculatorCategory.values.map((c) => _filterChip(c.label, _category == c && !_onlyFavorites,
-                            () => setState(() { _category = c; _onlyFavorites = false; }))),
-                        _filterChip('Favoritas', _onlyFavorites, () => setState(() { _onlyFavorites = true; _category = null; }), icon: Icons.star_outline),
+                        ...CalculatorCategory.values.map((c) => _filterChip(
+                          c.label, _category == c && !_onlyFavorites,
+                          () => setState(() { _category = c; _onlyFavorites = false; }),
+                        )),
                       ]),
                     ),
                     const SizedBox(height: 16),

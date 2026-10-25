@@ -1,13 +1,14 @@
 import 'dart:math' as math;
 
 /// Mathematics-only domain layer: no UI, networking or clinical decisions.
-enum CalculatorCategory { solutions, quality, production }
+enum CalculatorCategory { solutions, quality, production, prescriptions }
 
 extension CategoryLabel on CalculatorCategory {
   String get label => switch (this) {
         CalculatorCategory.solutions => 'Soluções',
         CalculatorCategory.quality => 'Controle de qualidade',
         CalculatorCategory.production => 'Produção',
+        CalculatorCategory.prescriptions => 'Prescrições',
       };
 }
 
@@ -257,6 +258,16 @@ const calculators = <CalculatorDefinition>[
       CalculatorField('volume', 'Volume transferido', 'mL', '500'),
       CalculatorField('time', 'Tempo', 'min', '10'),
     ], note: 'Vazão média para o intervalo medido; não representa uma vazão instantânea.'),
+  CalculatorDefinition(
+    id: 'prescription_units',
+    name: 'Quantidade da prescrição',
+    summary: 'Posologia, apresentação e dose máxima informada',
+    category: CalculatorCategory.prescriptions,
+    formula: 'Quantidade = dose por tomada / teor por unidade × tomadas por dia × dias',
+    fields: [],
+    note: 'A tela dedicada exige a fonte e o contexto do limite diário. '
+        'Não substitui avaliação clínica, checagem de bula nem autorização de dispensação.',
+  ),
 ];
 
 class CalculatorException implements Exception {

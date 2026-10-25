@@ -7,14 +7,28 @@ import 'package:http/http.dart' as http;
 import 'package:open_filex/open_filex.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-/// Source of PUBLIC GitHub Releases. Never embed a GitHub token in the app.
-/// A private source repository requires a separate public distribution repo
-/// (supplied via --dart-define=AURORA_UPDATE_REPO=owner/public-repo).
-const updateRepository = String.fromEnvironment(
-  'AURORA_UPDATE_REPO',
-  defaultValue: 'fabriciomatosqa/Aurora-calculadorafarmaceutica',
-);
+/// Public GitHub distribution repository. Source stays PRIVATE.
+/// No GitHub access token is ever stored in the APK.
+const defaultUpdateRepository =
+    'fabriciomatosqa/aurora-calculadora-farmaceutica-updates';
+const _updateRepoKey = 'aurora_public_update_repository_v1';
+
+String validateUpdateRepository(String input) {
+  final repo = input.trim();
+  if (!RegExp(r'^fabriciomatosqa/[A-Za-z0-9._-]{1,100}$',
+      caseSensitive: false).hasMatch(repo)) {
+    throw const UpdateException(
+      'Informe um repositório público da conta fabriciomatosqa '
+      '(formato: fabriciomatosqa/nome-do-repositorio).',
+    );
+  }
+  if (repo.split('/')[1].startsWith('.')) {
+    throw const UpdateException('Nome de repositório inválido.');
+  }
+  return repo;
+}
 
 class AppRelease {
   const AppRelease({
@@ -117,13 +131,32 @@ class UpdateService {
 
   void dispose() => _client.close();
 
+  Future<String> configuredRepository() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString(_updateRepoKey);
+    return validateUpdateRepository(
+      saved == null || saved.trim().isEmpty
+          ? defaultUpdateRepository
+          : saved,
+    );
+  }
+
+  Future<void> configureRepository(String value) async {
+    final checked = validateUpdateRepository(value);
+    final prefs = await SharedPreferences.getInstance();
+    if (!await prefs.setString(_updateRepoKey, checked)) {
+      throw const UpdateException('Não foi possível salvar o canal.');
+    }
+  }
+
   Future<String> installedVersion() async =>
       (await PackageInfo.fromPlatform()).version;
 
   Future<AppRelease?> latestAvailable() async {
     final current = await installedVersion();
+    final repository = await configuredRepository();
     final uri = Uri.https('api.github.com',
-        '/repos/$updateRepository/releases/latest');
+        '/repos/$repository/releases/latest');
     final response = await _client.get(uri, headers: {
       'Accept': 'application/vnd.github+json',
       'X-GitHub-Api-Version': '2022-11-28',
@@ -132,8 +165,9 @@ class UpdateService {
 
     if (response.statusCode == 404) {
       throw const UpdateException(
-        'Não foi possível consultar os Releases. O repositório pode ser '
-        'privado ou ainda não possuir uma versão publicada.',
+        'Este canal não possui um Release público acessível. '
+        'Confira em Configurar atualizações se o repositório está público '
+        'e contém uma versão Android publicada.',
       );
     }
     if (response.statusCode != 200) {
@@ -144,7 +178,11 @@ class UpdateService {
       throw const UpdateException('Dados de versão inválidos.');
     }
     final release = parseRelease(parsed);
-    return compareVersions(release.version, current) > 0 ? release : null;
+    if (compareVersions(release.version, current) <= 0) return null;
+    if (release.apkUrl == null) {
+      throw const UpdateException('Release não contém APK Android compatível.');
+    }
+    return release;
   }
 
   /// Download is verified against GitHub's asset SHA-256 or a .sha256 asset.
@@ -187,6 +225,7 @@ class UpdateService {
     }
     final sink = file.openWrite();
     var received = 0;
+    var sinkClosed = false;
     try {
       await for (final chunk in response.stream.timeout(_timeout)) {
         received += chunk.length;
@@ -198,13 +237,14 @@ class UpdateService {
       }
       await sink.flush();
       await sink.close();
+      sinkClosed = true;
       final checksum = await sha256.bind(file.openRead()).first;
       if (checksum.toString().toLowerCase() != expectedSha) {
         throw const UpdateException('Verificação SHA-256 falhou. APK descartado.');
       }
       return file;
     } catch (_) {
-      await sink.close();
+      if (!sinkClosed) await sink.close();
       if (await file.exists()) await file.delete();
       rethrow;
     }

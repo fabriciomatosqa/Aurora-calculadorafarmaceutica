@@ -102,35 +102,31 @@ jobs:
           path: dist/
           if-no-files-found: error
           retention-days: 30
-      - name: Publicar APK assinado no repositório PÚBLICO de distribuição
+      - name: Publicar Release do APK no repositório OFICIAL
         if: env.AURORA_RELEASE_READY == 'true'
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.AURORA_PUBLIC_RELEASE_TOKEN }}
-          DISTRIBUTION_REPO: ${{ vars.AURORA_PUBLIC_RELEASE_REPO }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          if [[ -z "$GH_TOKEN" || -z "$DISTRIBUTION_REPO" ]]; then
-            echo "::warning::Atualização pública pendente: configure o repositório público e AURORA_PUBLIC_RELEASE_TOKEN."
-            echo "APK assinado nos Artifacts, mas ainda NÃO acessível pelo atualizador online." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          if [[ ! "$DISTRIBUTION_REPO" =~ ^fabriciomatosqa/[A-Za-z0-9._-]+$ ]]; then
-            echo "::error::AURORA_PUBLIC_RELEASE_REPO deve ser da conta fabriciomatosqa"
-            exit 1
-          fi
-          if [[ "$(gh api "repos/$DISTRIBUTION_REPO" --jq '.private')" != "false" ]]; then
-            echo "::error::O repositório de distribuição precisa ser público"
-            exit 1
-          fi
           TAG="v${AURORA_VERSION}"
-          if gh release view "$TAG" --repo "$DISTRIBUTION_REPO" >/dev/null 2>&1; then
-            echo "Release $TAG já está publicado no canal público. Não sobrescrevendo."
+          REPO="${GITHUB_REPOSITORY}"
+          echo "Preparando Release Android $TAG em $REPO"
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            echo "::notice::Release $TAG já existe. Aumente a versão em pubspec.yaml para uma nova atualização."
             exit 0
           fi
           gh release create "$TAG" "dist/${AURORA_APK_NAME}" "dist/${AURORA_APK_NAME}.sha256" \
-            --repo "$DISTRIBUTION_REPO" \
+            --repo "$REPO" --target "$GITHUB_SHA" \
             --title "AURORA Calculadora Farmacêutica $TAG" \
-            --notes "Nova versão Android. Baixe o APK assinado e confirme a instalação no dispositivo." \
+            --notes "Nova versão Android: cálculo de soluções, qualidade, produção e prescrições. Instalação pelo aplicativo mediante confirmação do usuário. Uso farmacêutico regulado exige validação." \
             --latest
-          echo "Atualização disponível: https://github.com/$DISTRIBUTION_REPO/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"
+          echo "Release disponível: https://github.com/$REPO/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"
+      - name: Informar pendência de assinatura
+        if: env.AURORA_RELEASE_READY != 'true'
+        shell: bash
+        run: |
+          echo "::warning::Nenhum APK release publicado: faltam secrets da chave de assinatura Android."
+          echo "### Atualização online ainda não ativada" >> "$GITHUB_STEP_SUMMARY"
+          echo "O APK DEBUG desta execução está disponível somente como Actions Artifact." >> "$GITHUB_STEP_SUMMARY"
+          echo "Para publicar Releases instaláveis com atualizações, configure AURORA_KEYSTORE_BASE64, AURORA_KEYSTORE_PASSWORD, AURORA_KEY_ALIAS e AURORA_KEY_PASSWORD em Settings > Secrets and variables > Actions." >> "$GITHUB_STEP_SUMMARY"

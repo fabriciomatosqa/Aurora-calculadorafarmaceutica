@@ -2,6 +2,23 @@ import 'package:aurora_calculadora_farmaceutica/services/update_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('Validação da fonte de atualização não admite URLs ou outros owners', () {
+    expect(validateUpdateRepository(defaultUpdateRepository),
+        defaultUpdateRepository);
+    expect(validateUpdateRepository(' fabriciomatosqa/meus-apks '),
+        'fabriciomatosqa/meus-apks');
+    for (final invalid in [
+      'https://github.com/fabriciomatosqa/meus-apks',
+      'atacante/falso',
+      'fabriciomatosqa/',
+      'fabriciomatosqa/repo/extra',
+      'fabriciomatosqa/.git',
+    ]) {
+      expect(() => validateUpdateRepository(invalid),
+          throwsA(isA<UpdateException>()));
+    }
+  });
+
   test('Compara versões numericamente e ignora prefixo v', () {
     expect(compareVersions('v0.2.0', '0.1.0'), greaterThan(0));
     expect(compareVersions('1.10.0', '1.9.9'), greaterThan(0));

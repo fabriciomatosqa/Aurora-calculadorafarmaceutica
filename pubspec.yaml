@@ -17,7 +17,7 @@ dependencies:
   path_provider: ^2.1.5
   url_launcher: ^6.3.1
   image_picker: ^1.2.3
-  file_picker: '>=12.3.0 <13.0.0'
+  file_picker: 12.3.0
   google_mlkit_text_recognition: ^0.15.1
   pdfrx: ^2.6.5
 

@@ -55,6 +55,9 @@ jobs:
         run: |
           set -o pipefail
           flutter test 2>&1 | tee .ci-logs/flutter-test.log
+      - name: Testar manifesto e assinatura do APK de distribuição
+        run: python3 -m unittest discover -s release -p 'test_*.py'
+
       - name: Compilar APK de teste (pacote separado da produção)
         shell: bash
         run: |
@@ -100,50 +103,14 @@ jobs:
           AURORA_KEY_ALIAS: ${{ secrets.AURORA_KEY_ALIAS }}
           AURORA_KEY_PASSWORD: ${{ secrets.AURORA_KEY_PASSWORD }}
         run: flutter build apk --release
-      - name: Conferir pacote e assinatura de distribuição
+      - name: Validar APK assinado e criar manifesto do atualizador
         if: env.AURORA_RELEASE_READY == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          SDK_PATH="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
-          BUILD_TOOLS="$(find "$SDK_PATH/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
-          APK="build/app/outputs/flutter-apk/app-release.apk"
-          PACKAGE="$("$BUILD_TOOLS/aapt" dump badging "$APK" | sed -n "s/^package: name='\\([^']*\\)'.*/\\1/p")"
-          VERSION_CODE="$("$BUILD_TOOLS/aapt" dump badging "$APK" | sed -n "s/^package: .*versionCode='\\([^']*\\)'.*/\\1/p")"
-          echo "Pacote RELEASE: $PACKAGE / versão $VERSION_CODE"
-          if [[ "$PACKAGE" != "br.com.aurora.aurora_calculadora_farmaceutica" ]]; then
-            echo "::error::ID do pacote mudou: atualizações sobre instalações antigas serão recusadas"
-            exit 1
-          fi
-          EXPECTED_BUILD="$(sed -n 's/^version: [^+]*+\\([0-9][0-9]*\\).*/\\1/p' pubspec.yaml)"
-          if [[ -z "$EXPECTED_BUILD" || "$VERSION_CODE" != "$EXPECTED_BUILD" ]]; then
-            echo "::error::versionCode APK ($VERSION_CODE) difere do pubspec ($EXPECTED_BUILD)"
-            exit 1
-          fi
-          "$BUILD_TOOLS/apksigner" verify --print-certs "$APK" | tee signing-report.txt
-          CERT_SHA="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' signing-report.txt | head -n 1)"
-          if [[ ! "$CERT_SHA" =~ ^[[:xdigit:]]{64}$ ]]; then
-            echo "::error::Não foi possível validar o certificado de assinatura"
-            exit 1
-          fi
-          echo "Certificado SHA-256: $CERT_SHA" >> "$GITHUB_STEP_SUMMARY"
-          echo "Atenção: preservar o MESMO certificado para todas as próximas versões." >> "$GITHUB_STEP_SUMMARY"
-      - name: Montar APK versionado e checksum
-        if: env.AURORA_RELEASE_READY == 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          VERSION=$(sed -n 's/^version: \([^+]*\).*/\1/p' pubspec.yaml)
-          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Invalid pubspec version"; exit 1
-          fi
-          mkdir -p dist
-          NAME="aurora-calculadora-farmaceutica-v${VERSION}-android.apk"
-          cp build/app/outputs/flutter-apk/app-release.apk "dist/${NAME}"
-          (cd dist && sha256sum "${NAME}" > "${NAME}.sha256")
-          cp signing-report.txt dist/assinatura-android.txt
-          echo "AURORA_VERSION=$VERSION" >> "$GITHUB_ENV"
-          echo "AURORA_APK_NAME=$NAME" >> "$GITHUB_ENV"
+          python3 release/prepare_android.py build/app/outputs/flutter-apk/app-release.apk dist
+          echo "Manifesto, APK e SHA-256 criados e assinatura verificada" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Publicar release APK como artifact
         if: env.AURORA_RELEASE_READY == 'true'
         uses: actions/upload-artifact@v4
@@ -152,31 +119,19 @@ jobs:
           path: dist/
           if-no-files-found: error
           retention-days: 30
-      - name: Publicar Release do APK no repositório OFICIAL
+      - name: Publicar versão assinada via Release completo (mesmo fluxo do IPTV)
         if: env.AURORA_RELEASE_READY == 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          TAG="v${AURORA_VERSION}"
-          REPO="${GITHUB_REPOSITORY}"
-          echo "Preparando Release Android $TAG em $REPO"
-          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
-            echo "::notice::Release $TAG já existe. Aumente a versão em pubspec.yaml para uma nova atualização."
-            exit 0
-          fi
-          gh release create "$TAG" "dist/${AURORA_APK_NAME}" "dist/${AURORA_APK_NAME}.sha256" "dist/assinatura-android.txt" \
-            --repo "$REPO" --target "$GITHUB_SHA" \
-            --title "AURORA Calculadora Farmacêutica $TAG" \
-            --notes-file docs/RELEASE_NOTES.md \
-            --latest
-          echo "Release disponível: https://github.com/$REPO/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"
+          python3 release/publish_android.py
       - name: Informar pendência de assinatura
         if: env.AURORA_RELEASE_READY != 'true'
         shell: bash
         run: |
-          echo "::warning::Nenhum APK release publicado: faltam secrets da chave de assinatura Android."
+          echo "::warning::APK release não publicado: assinatura permanente não está configurada."
           echo "### Atualização online ainda não ativada" >> "$GITHUB_STEP_SUMMARY"
           echo "O APK DEBUG desta execução usa um pacote DIFERENTE e não serve para atualização do app oficial." >> "$GITHUB_STEP_SUMMARY"
           echo "Configure AURORA_KEYSTORE_BASE64, AURORA_KEYSTORE_PASSWORD, AURORA_KEY_ALIAS e AURORA_KEY_PASSWORD em Settings > Secrets and variables > Actions." >> "$GITHUB_STEP_SUMMARY"

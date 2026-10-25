@@ -39,8 +39,11 @@ Exigir-Comando 'gh'
 if ($NovoRepositorio -notmatch '^fabriciomatosqa/[a-zA-Z0-9._-]+$' -or $NovoRepositorio -eq $Origem) {
   throw 'Destino invalido. Use outro repositorio na conta fabriciomatosqa.'
 }
-& gh auth status --hostname github.com 2>$null
-if ($LASTEXITCODE -ne 0) {
+$ErrorActionPreference = 'Continue'
+& gh auth status --hostname github.com *> $null
+$autenticado = ($LASTEXITCODE -eq 0)
+$ErrorActionPreference = 'Stop'
+if (-not $autenticado) {
   Write-Host 'Autenticando pelo GitHub CLI...'
   & gh auth login --hostname github.com --scopes 'repo,workflow'
   Verificar-Exit 'Login GitHub'
@@ -53,8 +56,11 @@ if ($login -ne 'fabriciomatosqa') {
 & gh auth setup-git
 Verificar-Exit 'Autorizacao do acesso Git'
 
-& gh repo view $NovoRepositorio --json nameWithOwner 2>$null | Out-Null
-if ($LASTEXITCODE -eq 0) {
+$ErrorActionPreference = 'Continue'
+& gh repo view $NovoRepositorio --json nameWithOwner *> $null
+$jaExiste = ($LASTEXITCODE -eq 0)
+$ErrorActionPreference = 'Stop'
+if ($jaExiste) {
   throw "O repositorio $NovoRepositorio ja existe; nao sera sobrescrito."
 }
 
@@ -141,6 +147,17 @@ O primeiro upgrade pode requerer migracao; os proximos sao no proprio app.
   if (-not $updater.Contains("const updateRepository = '$NovoRepositorio'") -or
       -not $preparador.Contains($novaDeclaracao)) {
     throw 'Algum endereco do atualizador nao foi atualizado.'
+  }
+  # Preencha identidade APENAS no clone migrado se o Git local nao possuir.
+  $nomeGit = (& git config --get user.name)
+  if ([string]::IsNullOrWhiteSpace($nomeGit)) {
+    & git config user.name $login
+    Verificar-Exit 'Configuracao de nome Git'
+  }
+  $emailGit = (& git config --get user.email)
+  if ([string]::IsNullOrWhiteSpace($emailGit)) {
+    & git config user.email "$login@users.noreply.github.com"
+    Verificar-Exit 'Configuracao de e-mail Git local'
   }
   & git diff --check
   Verificar-Exit 'Validacao das diferencas'

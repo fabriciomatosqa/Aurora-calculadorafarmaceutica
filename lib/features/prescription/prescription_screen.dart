@@ -30,6 +30,7 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
   String? _error;
   String? _ocrReviewNote;
   bool _reviewedOcr = false;
+  bool _unsupportedOcrSchedule = false;
   final _formKey = GlobalKey();
 
   @override
@@ -70,6 +71,7 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
       _reference.clear();
       _package.clear();
       _reviewedOcr = false;
+      _unsupportedOcrSchedule = item.warnings.any((warning) => warning.startsWith('Esquema variável/SOS'));
       _ocrReviewNote = item.warnings.isEmpty
           ? 'Dados importados do OCR. Confirme todos os valores com a imagem original.'
           : 'A leitura contém campos ausentes ou situações não suportadas: '
@@ -89,6 +91,15 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
 
   void _calculate() {
     FocusScope.of(context).unfocus();
+    if (_unsupportedOcrSchedule) {
+      setState(() {
+        _error = 'Esquema SOS, variável ou individualizado detectado. '
+            'Esta calculadora aceita somente dose fixa e regular; '
+            'faça revisão farmacêutica específica.';
+        _result = null;
+      });
+      return;
+    }
     if (_ocrReviewNote != null && !_reviewedOcr) {
       setState(() {
         _error = 'Confira a prescrição original e confirme os dados '
@@ -152,6 +163,7 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
     setState(() {
       _ocrReviewNote = null;
       _reviewedOcr = false;
+      _unsupportedOcrSchedule = false;
       _result = null;
       _error = null;
     });
@@ -171,7 +183,8 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
         helperMaxLines: 3,
       ),
       onChanged: (_) {
-        if (_result != null || _error != null) {
+        if (_result != null || _error != null ||
+            (_ocrReviewNote != null && _reviewedOcr)) {
           setState(() {
             _result = null;
             _error = null;
@@ -422,7 +435,8 @@ class _PrescriptionScreenState extends State<PrescriptionScreen> {
                   helperMaxLines: 3,
                 ),
                 onChanged: (_) {
-                  if (_result != null || _error != null) {
+                  if (_result != null || _error != null ||
+            (_ocrReviewNote != null && _reviewedOcr)) {
                     setState(() {
                       _result = null;
                       _error = null;

@@ -7,7 +7,7 @@ CalculationResult run(String id, Map<String, String> values) => calculate(d(id),
 void main() {
   test('Catálogo possui 22 IDs distintos com fórmulas e aviso', () {
     expect(calculators.length, 22);
-    expect(calculators.map((c) => c.id).toSet().length, 21);
+    expect(calculators.map((c) => c.id).toSet().length, 22);
     expect(calculators.every((c) => c.formula.isNotEmpty && c.note.isNotEmpty), true);
   });
 

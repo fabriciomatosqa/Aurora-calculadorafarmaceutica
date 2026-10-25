@@ -82,6 +82,8 @@ class PrescriptionDocumentReader {
 
   Future<PrescriptionDocument> _readPdf(String path, String name) async {
     await _validateSize(path);
+    // pdfrx requires initialization before direct, non-widget PDF access.
+    await pdfrxFlutterInitialize();
     final pdf = await PdfDocument.openFile(path);
     try {
       if (pdf.pages.length > maxPdfPages) {

@@ -1,5 +1,25 @@
 # Atualização online do AURORA — Android v0.6.2
 
+## Configuração da assinatura em um comando no Windows
+
+O repositório é público, mas a **chave privada de assinatura não pode ser publicada junto com o código**. Uma conta GitHub autenticada precisa gravar os quatro Secrets uma única vez. O projeto inclui o script [`scripts/configurar_assinatura_android.ps1`](../scripts/configurar_assinatura_android.ps1) para automatizar a operação **na sua máquina**.
+
+Pré-requisitos: [GitHub CLI (`gh`)](https://cli.github.com/) e Java JDK (com `keytool` no PATH). Depois de obter uma cópia local do projeto:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\configurar_assinatura_android.ps1
+```
+
+O script verifica ou inicia o login do GitHub, reutiliza uma keystore existente ou pede autorização antes de criar uma nova, solicita a senha sem mostrá-la, configura os quatro Secrets com `gh secret set`, verifica os nomes cadastrados e solicita a execução do GitHub Actions, que gera um Release assinado se todos os testes passarem. A chave privada permanece em arquivo local e **não é inserida no código público nem em logs da CI**.
+
+Para reutilizar uma keystore anterior (recomendado quando tiver a chave original do aplicativo instalado):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\configurar_assinatura_android.ps1 -KeystorePath 'C:\caminho\chave-original.jks' -KeyAlias 'alias-original'
+```
+
+**Guarde um backup offline do arquivo e da senha em local seguro.** A senha e a chave não podem ser recuperadas a partir dos GitHub Secrets. Se a instalação atual possui outra assinatura e a chave antiga está indisponível, o Android não aceita atualização por cima dela: antes de desinstalar, exporte ou preserve os dados importantes. O primeiro Release oficial pode exigir uma migração única; os Releases seguintes, assinados com a chave estável, poderão ser instalados pelo AURORA.
+
 ## O erro "o pacote tem um conflito com um pacote já existente"
 
 Se o arquivo que você está instalando é `app-debug.apk` de um Artifact `aurora-farmaceutica-debug-N`, **não é o APK oficial de atualização**. Esses APKs de teste foram gerados em máquinas temporárias do GitHub Actions e podiam usar certificados diferentes entre execuções. O Android bloqueia atualização com assinatura distinta, mesmo com o mesmo nome e package ID.

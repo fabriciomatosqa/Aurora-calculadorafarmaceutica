@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../domain/prescription.dart';
 import 'prescription_ocr_parser.dart';
 
 /// OCR data remains on device in temporary memory/cache, not persisted or sent.

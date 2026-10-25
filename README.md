@@ -2,7 +2,7 @@
 
 Aplicativo Flutter com foco exclusivo na versão **Android**, em português, com **22 calculadoras** para soluções, qualidade, produção e avaliação matemática de prescrições. Os cálculos funcionam offline; inclui interface clara/escura, pesquisa, favoritos locais e cópia de resultados. O iOS está fora das prioridades de desenvolvimento.
 
-> **ATENÇÃO — Protótipo técnico v0.6.0.** Não validado para uso em ambiente regulado, decisão clínica, liberação/reprovação de lotes ou substituição de POPs e métodos aprovados. Toda fórmula, unidade, precisão, arredondamento, faixa, rastreabilidade e condição de aplicação deve ser avaliada pelo responsável técnico antes do uso operacional. Nenhum resultado determina conformidade.
+> **ATENÇÃO — Protótipo técnico v0.6.1.** Não validado para uso em ambiente regulado, decisão clínica, liberação/reprovação de lotes ou substituição de POPs e métodos aprovados. Toda fórmula, unidade, precisão, arredondamento, faixa, rastreabilidade e condição de aplicação deve ser avaliada pelo responsável técnico antes do uso operacional. Nenhum resultado determina conformidade.
 
 ## Calculadoras
 
@@ -14,7 +14,7 @@ Aplicativo Flutter com foco exclusivo na versão **Android**, em português, com
 
 **Prescrições (1):** quantidade de comprimidos/cápsulas/sachês inteiros ou volume de líquidos orais para tratamento de dose fixa; comparação da dose diária calculada com limite *informado* e estimativa opcional de embalagens. Veja [regras, validações, limitações e fontes](docs/PRESCRICOES.md).
 
-Cada tela informa unidades fixas, fórmula e limitações. Valores monetários ou clínicos não fazem parte do escopo da versão 0.6.0. Em DPR, separar medições por ponto e vírgula ou linhas (vírgula pode ser separador decimal).
+Cada tela informa unidades fixas, fórmula e limitações. Valores monetários ou clínicos não fazem parte do escopo da versão 0.6.1. Em DPR, separar medições por ponto e vírgula ou linhas (vírgula pode ser separador decimal).
 
 ## Android — construir e obter APK
 
@@ -35,7 +35,11 @@ flutter build apk --debug
 
 Saída típica: `build/app/outputs/flutter-apk/app-debug.apk`.
 
-## Importar prescrições por câmera, foto ou PDF (Android v0.6.0)
+## Compatibilidade Android do seletor de arquivos
+
+A versão 0.6.1 corrige a compilação Android (AGP 9) atualizando `file_picker` para a série 12.3.x. A seleção de um único arquivo usa `FilePicker.pickFile` e lê seu conteúdo via streaming; os arquivos temporários são eliminados após o processamento. Consulte [notas completas da versão](docs/RELEASE_NOTES.md).
+
+## Importar prescrições por câmera, foto ou PDF (Android v0.6.1)
 
 Na categoria **Prescrições**, abra **Quantidade da prescrição**. O cartão **1. IMPORTAR PRESCRIÇÃO** aparece em destaque no topo com três opções: **Tirar foto**, **Galeria** e **Arquivo / PDF**.
 
@@ -46,7 +50,7 @@ Na categoria **Prescrições**, abra **Quantidade da prescrição**. O cartão *
 - **Favoritos** agora é a primeira aba do catálogo, à frente de Todas.
 - Consulte [detalhes e limitações de importação](docs/PRESCRICOES.md).
 
-## Atualização online pelo próprio app Android (v0.6.0)
+## Atualização online pelo próprio app Android (v0.6.1)
 
 O repositório oficial agora é **PÚBLICO**. O aplicativo consulta os [Releases do próprio repositório](https://github.com/fabriciomatosqa/Aurora-calculadorafarmaceutica/releases) ao iniciar e ao retornar ao primeiro plano, além do botão de verificação no topo. Nenhuma configuração de outro repositório, credencial ou download manual pelo GitHub é necessária **para versões release assinadas compatíveis**.
 

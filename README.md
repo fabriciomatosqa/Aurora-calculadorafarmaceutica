@@ -1,8 +1,8 @@
 # AURORA Calculadora Farmacêutica
 
-Aplicativo Flutter com foco exclusivo na versão **Android**, em português, com **22 calculadoras** para soluções, qualidade, produção e avaliação matemática de prescrições. Os cálculos funcionam offline; inclui interface clara/escura, pesquisa, favoritos locais e cópia de resultados. O iOS está fora das prioridades de desenvolvimento.
+Aplicativo Flutter com foco exclusivo na versão **Android**, em português, com **22 calculadoras** para soluções, qualidade, produção e avaliação matemática de prescrições. Os cálculos funcionam offline; inclui leitura local de prescrições por foto, interface clara/escura, pesquisa, favoritos locais e cópia de resultados. O iOS está fora das prioridades de desenvolvimento.
 
-> **ATENÇÃO — Protótipo técnico v0.4.0.** Não validado para uso em ambiente regulado, decisão clínica, liberação/reprovação de lotes ou substituição de POPs e métodos aprovados. Toda fórmula, unidade, precisão, arredondamento, faixa, rastreabilidade e condição de aplicação deve ser avaliada pelo responsável técnico antes do uso operacional. Nenhum resultado determina conformidade.
+> **ATENÇÃO — Protótipo técnico v0.5.0.** Não validado para uso em ambiente regulado, decisão clínica, liberação/reprovação de lotes ou substituição de POPs e métodos aprovados. Toda fórmula, unidade, precisão, arredondamento, faixa, rastreabilidade e condição de aplicação deve ser avaliada pelo responsável técnico antes do uso operacional. Nenhum resultado determina conformidade.
 
 ## Calculadoras
 
@@ -12,9 +12,39 @@ Aplicativo Flutter com foco exclusivo na versão **Android**, em português, com
 
 **Produção (5):** rendimento de lote, perda de processo, escalonamento, massa teórica de comprimidos, vazão volumétrica.
 
-**Prescrições (1):** quantidade de comprimidos/cápsulas/sachês inteiros ou volume de líquidos orais para tratamento de dose fixa; comparação da dose diária calculada com limite *informado* e estimativa opcional de embalagens. Veja [regras, validações, limitações e fontes](docs/PRESCRICOES.md).
+**Prescrições (1):** leitura de prescrição completa por câmera/galeria com OCR local, revisão humana de cada medicamento e cálculo somente após confirmação; quantidade de comprimidos/cápsulas/sachês inteiros ou volume de líquidos orais para tratamento de dose fixa; comparação da dose diária calculada com limite *informado* e estimativa opcional de embalagens. Veja [regras, validações, limitações e fontes](docs/PRESCRICOES.md).
 
-Cada tela informa unidades fixas, fórmula e limitações. Valores monetários ou clínicos não fazem parte do escopo da versão 0.4.0. Em DPR, separar medições por ponto e vírgula ou linhas (vírgula pode ser separador decimal).
+Cada tela informa unidades fixas, fórmula e limitações. Valores monetários ou clínicos não fazem parte do escopo da versão 0.5.0. Em DPR, separar medições por ponto e vírgula ou linhas (vírgula pode ser separador decimal).
+
+## Leitura por foto (v0.5.0)
+
+Em **Prescrição e posologia → Ler prescrição por foto**, use câmera ou galeria.
+O reconhecimento de texto é realizado no aparelho com ML Kit (escrita latina),
+sem API externa, sem salvar transcrições em preferências e sem enviar fotos ao
+servidor. A foto permanece no cache temporário do Android até a limpeza pelo
+sistema; evite incluir dados identificáveis desnecessários.
+
+O analisador conservador lista **possíveis** medicamentos com concentração
+expressa em mg e tenta identificar forma, dose por administração, frequência
+fixa e duração explícita. A transcrição é editável e pode ser reanalisada.
+Selecione cada medicamento para revisar os campos; o app **zera valores do item
+anterior**, exige confirmação de conferência e a dose máxima diária com sua
+fonte/documentação precisa ser informada separadamente pelo farmacêutico.
+Dados ambíguos, fórmulas variáveis, SOS, pediatria e outros esquemas complexos
+**não são avaliados automaticamente**.
+
+O algoritmo de OCR não garante leitura de receituário manuscrito, doses,
+unidades nem integridade/autenticidade do documento. É obrigatório comparar os
+dados com a prescrição original. Uma ausência de alerta numérico não indica
+segurança clínica. Este recurso ainda carece de ensaio em dispositivos e de
+validação independente; não é apto à dispensação profissional sem esse processo.
+
+### Responsividade
+
+Pesquisa no catálogo com debounce de 170 ms, checagem automática de
+atualizações limitada a intervalos de 3 horas (a verificação manual permanece
+disponível), remoção de reconstrução redundante ao retornar de calculadoras e
+melhorias no tema Material 3.
 
 ## Android — construir e obter APK
 
@@ -35,7 +65,7 @@ flutter build apk --debug
 
 Saída típica: `build/app/outputs/flutter-apk/app-debug.apk`.
 
-## Atualização diretamente pelo Android (v0.4.0)
+## Atualização diretamente pelo Android (v0.5.0)
 
 O aplicativo verifica atualizações públicas ao abrir e ao voltar ao primeiro plano; também oferece os ícones **Verificar atualizações** e **Configurar atualizações**. Quando identifica uma versão mais recente, mostra notas, pergunta se deseja atualizar, baixa o APK com indicador de progresso, valida SHA-256 e abre o instalador Android com confirmação do usuário. Os cálculos continuam disponíveis offline, sem exigir login no GitHub.
 

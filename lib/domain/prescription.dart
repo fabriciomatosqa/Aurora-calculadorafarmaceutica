@@ -169,7 +169,7 @@ PrescriptionCalculation calculatePrescription({
       );
     }
     packageCount = count;
-    leftover = math.max(0, count * packageCapacity - totalUnits);
+    leftover = math.max(0.0, count * packageCapacity - totalUnits);
   }
 
   return PrescriptionCalculation(

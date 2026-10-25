@@ -116,7 +116,7 @@ PrescriptionCalculation calculatePrescription({
     );
   }
 
-  final unitsPerAdministration =
+  var unitsPerAdministration =
       prescribedMgPerAdministration / strengthMgPerUnit;
   if (!unitsPerAdministration.isFinite ||
       unitsPerAdministration <= 0 ||
@@ -135,6 +135,8 @@ PrescriptionCalculation calculatePrescription({
         'e a prescrição com o profissional responsável.',
       );
     }
+    // Normalize floating-point noise only after checking whole-unit equivalence.
+    unitsPerAdministration = nearestInteger;
   }
 
   final totalUnits =
@@ -162,12 +164,13 @@ PrescriptionCalculation calculatePrescription({
         'Quantidade de unidades por caixa deve ser inteira.',
       );
     }
-    final count = (totalUnits / packageCapacity).ceil();
-    if (count > 1000000) {
+    final estimated = totalUnits / packageCapacity;
+    if (!estimated.isFinite || estimated <= 0 || estimated > 1000000) {
       throw const PrescriptionCalculationException(
         'Número de embalagens excede o limite desta ferramenta.',
       );
     }
+    final count = estimated.ceil();
     packageCount = count;
     leftover = math.max(0.0, count * packageCapacity - totalUnits);
   }
